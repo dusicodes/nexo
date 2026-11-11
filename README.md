@@ -155,7 +155,6 @@ Once the loop works, depth follows:
 
 - A full email client.
 - Banking: any write access to financial accounts is permanently out of scope; the finance surface is read-only context.
-- Original news: nexo curates news, it does not produce it.
 
 ## Current development status
 
@@ -164,8 +163,8 @@ Once the loop works, depth follows:
 | Product research | Complete |
 | Early prototypes | Available |
 | Initial PRD | Merged, see `PRD.md` ([PR #1](https://github.com/dusicodes/nexo/pull/1)) |
-| Application foundation | In progress ([issue #2](https://github.com/dusicodes/nexo/issues/2)) |
-| Technical architecture documentation | In progress ([issue #3](https://github.com/dusicodes/nexo/issues/3)) |
+| Technical architecture documentation | Initial draft merged, see `architecture.md` ([PR #4](https://github.com/dusicodes/nexo/pull/4)) |
+| Application foundation | In progress: stack scaffolded ([issue #2](https://github.com/dusicodes/nexo/issues/2)) |
 | Production feature set | Not shipped |
 
 To be clear: nexo has not shipped a production feature set yet. What exists today is the direction, the research and prototypes, and the beginnings of the foundation. The roadmap below is the path forward.
@@ -187,14 +186,69 @@ The selected technical direction from `PRD.md` and the foundation work. These ar
 ## Repository map and links
 
 - **`PRD.md`** - the product requirements document: vision, scope, and requirements in detail. The authoritative description of what nexo is.
-- **`architecture.md`** - planned, not yet in the repository; tracked in [issue #3](https://github.com/dusicodes/nexo/issues/3). This README does not depend on it.
+- **`architecture.md`** - the technical architecture record: modules, data ownership, seams, and security model. The entry point for implementation work.
 - **Issues and roadmap** - https://github.com/dusicodes/nexo/issues
 
-## Preview and development
+## Development
 
-The runnable application is not in this repository yet. Today the repository holds the product direction (`PRD.md`) and this README. The application foundation ([issue #2](https://github.com/dusicodes/nexo/issues/2)) will bring the app shell, the local data layer, and the first run instructions; this section will carry real setup and preview steps once it lands.
+The foundation slice is in place: the runnable app shell, the local data layer,
+the auth configuration, and the AI/MCP seams. No product features or screens
+are implemented yet.
 
-For now, the best way to explore nexo is to read `PRD.md`.
+### Requirements
+
+- Node 26 (see `.nvmrc`; Next.js 16 and AI SDK 7 both require a modern Node).
+- Rust and cargo, only for the Tauri desktop app (see below).
+
+### Getting started
+
+```sh
+nvm use
+npm install
+cp .env.example .env.local   # fill in at least BETTER_AUTH_SECRET
+npm run db:migrate           # creates the local PGlite database (.data/, gitignored)
+npm run dev
+```
+
+Open http://localhost:3000. Generate the auth secret with
+`npx @better-auth/cli secret`. Every other integration activates when its
+environment variables are set, as documented in `.env.example`.
+
+### Commands
+
+```sh
+npm run dev            # web dev server with HMR (Turbopack)
+npm run build          # production web build (serverful: API routes, server components)
+npm run start          # serve the production build
+npm run lint           # ESLint
+npm run db:generate    # create a SQL migration from src/db/schema changes
+npm run db:migrate     # apply migrations to the configured database
+npm run db:studio      # visual database browser (Postgres server only)
+npm run tauri dev      # desktop shell against the web dev server
+npm run tauri build    # production desktop bundle
+```
+
+The default database is **PGlite**, Postgres compiled to WASM, persisted under
+`.data/nexo` (gitignored). Set `DATABASE_URL` to a `postgres://` URL to use a
+Postgres server instead; `DATABASE_URL=memory` gives a throwaway in-memory
+database. The schema stays within Drizzle's portable subset so it can later
+serve the browser (PGlite), the desktop shell (SQLite), and a Postgres server
+(see `architecture.md` section 6).
+
+**Desktop note:** on a machine without Rust, `tauri dev` and `tauri build`
+cannot run yet; install Rust via https://rustup.rs and the commands above work
+as documented. The production desktop bundle is a static export, so serverful
+features (auth handler, MCP subprocesses) belong to web deployments; the
+desktop strategy for those is decided in a later slice, and desktop dev mode
+runs the full web app against the dev server.
+
+### Auth
+
+Better Auth is configured in `src/lib/auth.ts` with the Drizzle adapter; auth
+tables migrate with everything else. Google OAuth registers automatically when
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. No secrets are
+committed. The API route that mounts auth and the sign-in UI arrive in the
+auth slice.
 
 ## Feedback
 

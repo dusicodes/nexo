@@ -1,10 +1,11 @@
 # nexo - Architecture
 
-> **Document status:** initial comprehensive draft. As of this writing the repository contains
-> product documentation only (`PRD.md`, `README.md`); no application code exists yet.
-> Almost everything in this document is therefore marked `selected` (decided direction) or
-> `proposed`/`deferred`, not `implemented`. The status markers are the contract: treat no
-> marked item as a claim that working code exists.
+> **Document status:** initial comprehensive draft, updated as the foundation lands. The
+> repository now holds product documentation (`PRD.md`, `README.md`) plus the first
+> foundation slice: the application scaffold, the local data layer, the auth
+> configuration, and the AI/MCP seams. No product features exist yet. Status markers are
+> the contract: treat no `selected`/`proposed`/`deferred` item as a claim that working
+> code exists.
 
 ## 1. Purpose and audience
 
@@ -122,11 +123,11 @@ Boundary rules:
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Schema source of truth | Drizzle ORM; migrations generated and committed from it | `selected` |
+| Schema source of truth | Drizzle ORM; migrations generated and committed from it | `implemented` |
 | Browser persistence | PGlite (Postgres in WASM) | `selected` |
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
-| Server data path | Same Drizzle schema against a real Postgres (self-hosted single-user deployment or future sync hub) | `selected` |
-| Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends | `selected` |
+| Server data path | Same Drizzle schema against a real Postgres (self-hosted single-user deployment or future sync hub). Connection path implemented; not yet exercised against a live server | `implemented` |
+| Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
@@ -166,14 +167,17 @@ provider data before it is cached into the local database.
 
 ## 8. AI architecture
 
-> **Status:** This section describes selected and proposed design. No tool registry, agent enforcement, or AI integration is implemented yet.
+> **Status:** This section describes selected and proposed design. The AI SDK seams are
+> implemented: the DeepSeek provider adapter, a single-step assistant hook, the MCP
+> client, and the MCP-to-AI-tools bridge (all verified with mocks). The tool registry,
+> permission enforcement, and any product agent are not.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Orchestration | Vercel AI SDK for chat, streaming, and tool calling | `selected` |
+| Orchestration | Vercel AI SDK for chat, streaming, and tool calling | `implemented` |
 | Tool protocol | MCP exposes assistant tools; tools wrap repositories and provider adapters, so the assistant mutates only through the same data paths as the UI | `selected` |
-| Provider | DeepSeek API, called server-side; the key never reaches the client | `selected` |
-| Provider neutrality | Application code depends on the AI SDK abstraction only; provider choice is configuration | `selected` |
+| Provider | DeepSeek API, called server-side; the key never reaches the client | `implemented` |
+| Provider neutrality | Application code depends on the AI SDK abstraction only; provider choice is configuration | `implemented` |
 | Local models | Run on-device models through a compatible provider path (e.g. Ollama or similar runtimes) | `proposed` |
 
 **Tool permission classes and the confirmation boundary:**
@@ -195,11 +199,14 @@ pattern is the same one the daily planning loop uses.
 
 ## 9. Authentication and security
 
-> **Status:** This section describes selected and proposed security design. No authentication flow, OAuth route, local database, or provider secret handling is implemented yet.
+> **Status:** This section describes selected and proposed security design. Better Auth is
+> configured with the Drizzle adapter and its tables are migrated (no sign-in flow or
+> OAuth route yet); the local database exists; provider secret handling and the desktop
+> keychain remain to be built.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Auth | Better Auth with Google OAuth for server capabilities and provider integrations | `selected` |
+| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured and auth tables migrated; OAuth flow and route pending) | `selected` |
 | Auth scope | The local-first core (tasks, notes, reading) works without signing in; auth is only for server-mediated capabilities | `selected` |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens | `selected` |
 | Secrets | Provider API keys and OAuth client secrets live only in server environment variables, never in client bundles or the desktop binary; the server proxies all secret-backed calls | `selected` |
@@ -258,8 +265,9 @@ local-first, single-user product; managed hosting is `proposed`, not selected.
 
 **Environment configuration:** environment variables hold provider credentials and the
 optional server Postgres URL. `.env` files per environment, gitignored; a committed
-example file documents variable names. Public-vs-server env separation is enforced so
-secrets never reach the client bundle.
+`.env.example` documents variable names (`implemented`). Public-vs-server env separation
+is enforced so secrets never reach the client bundle - the enforcement lint is not
+built yet (`selected`).
 
 **Desktop packaging:** Tauri 2 bundles the web frontend with the shell for macOS,
 Windows, and Linux. Code signing and auto-update are later-stage items (`proposed`).
@@ -271,19 +279,28 @@ partial failure quietly. No user-content telemetry, ever.
 
 **Development workflow:**
 
-- Repository layout (`selected`, to be created): the Next.js app at the root; a `desktop/`
-  directory holding the Tauri project that embeds the web build. Shared code moves to
-  `packages/` only when the shell genuinely needs it (`proposed`).
+- Repository layout (`implemented`): the Next.js app at the root; the Tauri 2 project
+  in `src-tauri/` alongside `src/`. This is Tauri's standard layout for a root-level web
+  app and replaces the earlier `desktop/` plan: the shell is a single directory, and a
+  `desktop/` wrapper would only add an empty layer. Shared code moves to `packages/`
+  only when the shell genuinely needs it (`proposed`).
 - Local loop: run the web app in a browser against PGlite for fast iteration; Tauri dev
   mode for desktop-specific work.
 - Quality gates (`selected`, as code appears): typecheck, lint, unit tests at the seams
   from section 7, and E2E for the v1 loop, all in CI on PRs.
-- Migrations: Drizzle-generated migrations are committed and applied on app start for
-  PGlite/SQLite and by deployment tooling for Postgres.
+- Migrations (`implemented`): Drizzle-generated migrations are committed and applied
+  with `npm run db:migrate` (PGlite or Postgres). Automatic application at app start
+  arrives with the repository layer.
 
 ## 12. Current foundation versus planned product
 
-**Implemented today:** `PRD.md`, `README.md`, this document. Nothing else.
+**Implemented today:** `PRD.md`, `README.md`, this document, and the first part of
+Phase 0: the Next.js 16 + React 19 app scaffold with Tailwind 4 and shadcn/ui; the
+Tauri 2 shell scaffold at `src-tauri/` (no native capabilities yet); the Drizzle schema
+with committed migrations and a local PGlite dev path (browser PGlite and desktop
+SQLite still pending); the Better Auth configuration with migrated auth tables (route
+and sign-in still pending); and the AI SDK seams - DeepSeek provider, single-step
+assistant hook, MCP client and tool bridge (registry and enforcement still pending).
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -295,7 +312,9 @@ out-of-scope sections, and change only with the PRD):
 
 - **Phase 0, foundation (now):** this document; project scaffold; Drizzle schema and
   repositories over PGlite/SQLite; auth for server capabilities; AI orchestration behind
-  the provider adapter; the tool permission registry and confirmation UI; CI.
+  the provider adapter; the tool permission registry and confirmation UI; CI. The first
+  part landed with the foundation slice (issue #2); repositories, the registry,
+  confirmation UI, and CI remain.
 - **Phase 1, v1:** the daily planning loop, todo list, read-first GitHub dashboard, and
   reading list from the PRD's v1 scope.
 - **Phase 2 (deferred):** calendar with AI time-blocking (Google Calendar / Notion) and
@@ -307,14 +326,16 @@ out-of-scope sections, and change only with the PRD):
 
 - **D1** Local-first data ownership: the local database is the system of record (`selected`).
 - **D2** Drizzle ORM as schema source of truth; PGlite in the browser, SQLite under
-  Tauri, Postgres server path behind the one schema (`selected`).
-- **D3** Vercel AI SDK as the AI orchestration layer (`selected`).
+  Tauri, Postgres server path behind the one schema (`selected`; schema and migrations
+  committed, browser PGlite and desktop SQLite still pending).
+- **D3** Vercel AI SDK as the AI orchestration layer (`implemented`).
 - **D4** MCP as the tool integration protocol; assistant tools wrap the same repositories
-  the UI uses (`selected`).
-- **D5** DeepSeek API as the initial provider, behind a provider-neutral adapter (`selected`).
+  the UI uses (`selected`; MCP client and tool bridge landed, registry pending).
+- **D5** DeepSeek API as the initial provider, behind a provider-neutral adapter (`implemented`).
 - **D6** Better Auth with Google OAuth for server capabilities; the local core needs no
-  account (`selected`).
-- **D7** Web-first with a thin Tauri 2 desktop shell (`selected`).
+  account (`selected`; configuration and tables landed, flow pending).
+- **D7** Web-first with a thin Tauri 2 desktop shell (`implemented`; shell scaffolded,
+  native capabilities pending).
 - **D8** Confirmation model: read / local-mutation / external-write tool classes, enforced
   by the registry; integrations read-only by default (`selected`).
 - **D9** Finance integrations permanently read-only, no write actions ever (`selected`).
@@ -366,6 +387,14 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-11 - Foundation slice implemented from issue #2 (PR #7): Next.js 16 + React 19
+  scaffold with Tailwind 4 and shadcn/ui, Drizzle schema with committed migrations and
+  a local PGlite dev path, Better Auth configuration with migrated auth tables, AI SDK
+  seams (DeepSeek provider, single-step assistant hook, MCP client and tool bridge),
+  and the Tauri 2 shell scaffold. Marker updates in sections 6, 8, 9, 11, 12, and 13
+  accompany the code. One layout deviation is recorded: the Tauri project lives in
+  `src-tauri/` (Tauri's standard location for a root-level web app), replacing the
+  `desktop/` plan in section 11.
 - 2026-11-11 - Created as the initial comprehensive architecture record, capturing the
   selected direction from `PRD.md` and the project's technical research while the
   repository holds no application code. Origin: issue #3.
