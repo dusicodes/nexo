@@ -110,7 +110,7 @@ Boundary rules:
 
 - The browser/desktop client never holds provider secrets or OAuth client secrets.
 - Secret-backed calls go through Next.js server routes; the server is the only place
-  secrets live (desktop keychain tokens are the one exception, see section 8).
+  secrets live (desktop keychain tokens are the one exception, see section 9).
 - The local database is the system of record for user content; provider data is cached
   into it, never the reverse.
 - The Tauri shell duplicates no application logic. It exposes native capabilities
@@ -166,6 +166,8 @@ provider data before it is cached into the local database.
 
 ## 8. AI architecture
 
+> **Status:** This section describes selected and proposed design. No tool registry, agent enforcement, or AI integration is implemented yet.
+
 | Aspect | Direction | Status |
 | --- | --- | --- |
 | Orchestration | Vercel AI SDK for chat, streaming, and tool calling | `selected` |
@@ -192,6 +194,8 @@ approve/reject; nothing in class W executes without approval. This proposal-then
 pattern is the same one the daily planning loop uses.
 
 ## 9. Authentication and security
+
+> **Status:** This section describes selected and proposed security design. No authentication flow, OAuth route, local database, or provider secret handling is implemented yet.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
