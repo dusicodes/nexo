@@ -4,55 +4,30 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const WELCOME_TEXT = "Welcome to Nexo";
-const TYPING_INTERVAL_MS = 70;
+const LETTER_DELAY_MS = 50;
+const LETTER_DURATION_MS = 350;
 const PAUSE_AFTER_TYPE_MS = 500;
 const FADE_OUT_DURATION_MS = 700;
 
 export function WelcomeAnimation() {
   const [visible, setVisible] = useState(true);
-  const [text, setText] = useState("");
   const [isFading, setIsFading] = useState(false);
-  const typeTimerRef = useRef<number | null>(null);
-  const timeoutRef = useRef<number | null>(null);
-  const skippedRef = useRef(false);
+  const fadeTimerRef = useRef<number | null>(null);
 
-  const dismiss = (delay = FADE_OUT_DURATION_MS) => {
-    if (skippedRef.current) return;
-    skippedRef.current = true;
-    setText(WELCOME_TEXT);
+  const dismiss = () => {
+    if (isFading) return;
+    if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
     setIsFading(true);
-    timeoutRef.current = window.setTimeout(() => setVisible(false), delay);
   };
 
   useEffect(() => {
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (prefersReducedMotion) {
-      timeoutRef.current = window.setTimeout(() => {
-        setText(WELCOME_TEXT);
-        dismiss(FADE_OUT_DURATION_MS);
-      }, PAUSE_AFTER_TYPE_MS);
-    } else {
-      let index = 0;
-      typeTimerRef.current = window.setInterval(() => {
-        index += 1;
-        setText(WELCOME_TEXT.slice(0, index));
-
-        if (index >= WELCOME_TEXT.length) {
-          if (typeTimerRef.current) window.clearInterval(typeTimerRef.current);
-          timeoutRef.current = window.setTimeout(
-            () => dismiss(FADE_OUT_DURATION_MS),
-            PAUSE_AFTER_TYPE_MS
-          );
-        }
-      }, TYPING_INTERVAL_MS);
-    }
+    const totalTypingMs = WELCOME_TEXT.length * LETTER_DELAY_MS + LETTER_DURATION_MS;
+    fadeTimerRef.current = window.setTimeout(() => {
+      setIsFading(true);
+    }, totalTypingMs + PAUSE_AFTER_TYPE_MS);
 
     return () => {
-      if (typeTimerRef.current) window.clearInterval(typeTimerRef.current);
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
     };
   }, []);
 
@@ -61,15 +36,41 @@ export function WelcomeAnimation() {
   return (
     <div
       aria-hidden={isFading}
-      onClick={() => dismiss(FADE_OUT_DURATION_MS)}
+      onClick={dismiss}
+      onTransitionEnd={() => isFading && setVisible(false)}
       className={cn(
-        "fixed inset-0 z-40 flex cursor-default items-center justify-center bg-background transition-opacity duration-700 ease-out",
+        "fixed inset-0 z-40 flex cursor-default items-center justify-center bg-background transition-opacity ease-out",
         isFading ? "pointer-events-none opacity-0" : "opacity-100"
       )}
+      style={{ transitionDuration: `${FADE_OUT_DURATION_MS}ms` }}
     >
       <h1 className="pointer-events-none text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-        {text}
-        <span className="animate-pulse" aria-hidden="true">
+        {WELCOME_TEXT.split("").map((char, index) => (
+          <span
+            key={index}
+            className="welcome-letter inline-block"
+            style={{
+              animationName: "fade-in-up",
+              animationDuration: `${LETTER_DURATION_MS}ms`,
+              animationTimingFunction: "ease-out",
+              animationFillMode: "forwards",
+              animationDelay: `${index * LETTER_DELAY_MS}ms`,
+              opacity: 0,
+            }}
+          >
+            {char === " " ? "\u00A0" : char}
+          </span>
+        ))}
+        <span
+          className="welcome-cursor inline-block"
+          aria-hidden="true"
+          style={{
+            animationName: "blink-cursor",
+            animationDuration: "1s",
+            animationTimingFunction: "steps(1)",
+            animationIterationCount: "infinite",
+          }}
+        >
           |
         </span>
       </h1>
