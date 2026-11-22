@@ -88,3 +88,19 @@ test("light theme cookie is respected", async () => {
     "toggle should indicate it switches to dark mode"
   );
 });
+
+test("Google sign-in preview is rendered on the home page", async () => {
+  const html = await fetchHtml("/");
+
+  assert.match(html, /Continue with Google/, "sign-in button text should be present");
+  assert.match(
+    html,
+    /Google sign-in is not yet connected/,
+    "disclaimer should be present"
+  );
+  assert.match(
+    html,
+    /google-sign-in-status/,
+    "status region should be present"
+  );
+});
