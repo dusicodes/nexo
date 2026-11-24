@@ -200,13 +200,15 @@ pattern is the same one the daily planning loop uses.
 ## 9. Authentication and security
 
 > **Status:** This section describes selected and proposed security design. Better Auth is
-> configured with the Drizzle adapter and its tables are migrated (no sign-in flow or
-> OAuth route yet); the local database exists; provider secret handling and the desktop
+> configured with the Drizzle adapter and its tables are migrated; the email allowlist gate
+> is implemented in `src/lib/auth.ts` (no OAuth route or sign-in flow yet, so it is not yet
+> exercised end to end); the local database exists; provider secret handling and the desktop
 > keychain remain to be built.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
 | Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured and auth tables migrated; OAuth flow and route pending) | `selected` |
+| Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive) may sign in. Enforced by Better Auth's `user.validateUserInfo` on create, link and sign-in, before any user, account or session row is written. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
 | Auth scope | The local-first core (tasks, notes, reading) works without signing in; auth is only for server-mediated capabilities | `selected` |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens | `selected` |
 | Secrets | Provider API keys and OAuth client secrets live only in server environment variables, never in client bundles or the desktop binary; the server proxies all secret-backed calls | `selected` |
@@ -333,7 +335,8 @@ out-of-scope sections, and change only with the PRD):
   the UI uses (`selected`; MCP client and tool bridge landed, registry pending).
 - **D5** DeepSeek API as the initial provider, behind a provider-neutral adapter (`implemented`).
 - **D6** Better Auth with Google OAuth for server capabilities; the local core needs no
-  account (`selected`; configuration and tables landed, flow pending).
+  account (`selected`; configuration, tables and the email allowlist gate landed, flow
+  pending).
 - **D7** Web-first with a thin Tauri 2 desktop shell (`implemented`; shell scaffolded,
   native capabilities pending).
 - **D8** Confirmation model: read / local-mutation / external-write tool classes, enforced
@@ -387,6 +390,12 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Sign-in allowlist enforced from issue #20: `ALLOWED_EMAIL` is a
+  comma-separated list matched case-insensitively, applied through Better Auth's
+  `user.validateUserInfo` before any user, account or session row is written. Why: the app
+  stays single-user for now, and only the owner's listed Google accounts may sign in.
+  Updates section 9 (new allowlist row, status note) and D6. The OAuth route is still
+  pending, so the gate is not yet exercised end to end.
 - 2026-11-11 - Foundation slice implemented from issue #2 (PR #7): Next.js 16 + React 19
   scaffold with Tailwind 4 and shadcn/ui, Drizzle schema with committed migrations and
   a local PGlite dev path, Better Auth configuration with migrated auth tables, AI SDK
