@@ -5,7 +5,7 @@ import {
   readAuthConfig,
 } from "@/lib/auth-config";
 
-const complete = {
+const completeEnv = {
   BETTER_AUTH_SECRET: "secret-value",
   GOOGLE_CLIENT_ID: "client-id",
   GOOGLE_CLIENT_SECRET: "client-secret",
@@ -14,16 +14,16 @@ const complete = {
 
 describe("readAuthConfig", () => {
   it("returns the four settings when all are set", () => {
-    expect(readAuthConfig(complete)).toEqual({
+    expect(readAuthConfig(completeEnv)).toEqual({
       secret: "secret-value",
       googleClientId: "client-id",
       googleClientSecret: "client-secret",
-      allowedEmail: "owner@example.com",
+      allowlist: new Set(["owner@example.com"]),
     });
   });
 
   it.each(REQUIRED_AUTH_ENV)("throws naming %s when it is missing", (name) => {
-    const env: Record<string, string | undefined> = { ...complete };
+    const env: Record<string, string | undefined> = { ...completeEnv };
     delete env[name];
 
     expect(() => readAuthConfig(env)).toThrow(MissingAuthConfigError);
@@ -31,7 +31,7 @@ describe("readAuthConfig", () => {
   });
 
   it.each(REQUIRED_AUTH_ENV)("throws naming %s when it is empty", (name) => {
-    const env = { ...complete, [name]: "" };
+    const env = { ...completeEnv, [name]: "" };
 
     expect(() => readAuthConfig(env)).toThrow(MissingAuthConfigError);
     expect(() => readAuthConfig(env)).toThrow(name);
@@ -40,9 +40,22 @@ describe("readAuthConfig", () => {
   it.each(REQUIRED_AUTH_ENV)(
     "throws naming %s when it is only whitespace",
     (name) => {
-      const env = { ...complete, [name]: "   " };
+      const env = { ...completeEnv, [name]: "   " };
 
       expect(() => readAuthConfig(env)).toThrow(name);
     },
   );
+
+  it("returns values as written, without trimming them", () => {
+    const config = readAuthConfig({ ...completeEnv, BETTER_AUTH_SECRET: " s3cret " });
+
+    expect(config.secret).toBe(" s3cret ");
+  });
+
+  it("throws naming ALLOWED_EMAIL when it lists no addresses", () => {
+    const env = { ...completeEnv, ALLOWED_EMAIL: " , ," };
+
+    expect(() => readAuthConfig(env)).toThrow(MissingAuthConfigError);
+    expect(() => readAuthConfig(env)).toThrow("ALLOWED_EMAIL");
+  });
 });

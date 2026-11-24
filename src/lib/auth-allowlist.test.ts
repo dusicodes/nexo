@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isEmailAllowed } from "@/lib/auth-allowlist";
+import {
+  isEmailAllowed as isEmailAllowedIn,
+  parseAllowlist,
+  rejectUnlistedEmails,
+} from "@/lib/auth-allowlist";
+
+const isEmailAllowed = (email: string | undefined, raw: string) =>
+  isEmailAllowedIn(email, parseAllowlist(raw));
 
 describe("isEmailAllowed", () => {
   it("allows an email that is on the allowlist", () => {
@@ -48,5 +55,14 @@ describe("isEmailAllowed", () => {
       false,
     );
     expect(isEmailAllowed("xowner@example.com", "owner@example.com")).toBe(false);
+  });
+
+  it("returns the not-authorized error from the validateUserInfo hook", () => {
+    const validate = rejectUnlistedEmails(parseAllowlist("owner@example.com"));
+
+    expect(validate({ user: { email: "owner@example.com" } })).toBeUndefined();
+    expect(validate({ user: { email: "intruder@example.com" } })).toMatchObject({
+      error: "not_authorized",
+    });
   });
 });

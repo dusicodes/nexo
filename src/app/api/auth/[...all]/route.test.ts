@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { useAuthTestDatabase } from "@/test/auth-test-database";
 
 /**
  * The Better Auth HTTP handler is mounted at /api/auth/* so the Google
@@ -13,23 +14,12 @@ type Route = typeof import("@/app/api/auth/[...all]/route");
 describe("auth route handler", () => {
   let route: Route;
 
+  useAuthTestDatabase({ baseURL: BASE });
+
   beforeAll(async () => {
-    vi.stubEnv("BETTER_AUTH_SECRET", "route-test-secret");
-    vi.stubEnv("GOOGLE_CLIENT_ID", "route-client-id");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "route-client-secret");
-    vi.stubEnv("ALLOWED_EMAIL", "owner@example.com");
-    vi.stubEnv("DATABASE_URL", "memory");
-    vi.stubEnv("BETTER_AUTH_URL", BASE);
-
-    const { runMigrations } = await import("@/db/migrate");
-    await runMigrations();
-
     route = await import("@/app/api/auth/[...all]/route");
   });
 
-  afterAll(() => {
-    vi.unstubAllEnvs();
-  });
 
   it("answers Better Auth's session endpoint with a JSON body", async () => {
     const response = await route.GET(

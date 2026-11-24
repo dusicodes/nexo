@@ -214,14 +214,15 @@ pattern is the same one the daily planning loop uses.
 > sends signed-out requests for every page except login, the auth API, and static files to
 > `/login`; the login page, which starts Google sign-in, returns to a same-origin return
 > path, and shows sign-in errors; a sign-out button in the protected layout
-> (`src/app/(app)/layout.tsx`); and signed-in visitors to `/login` being sent on. Not yet
-> verified: a real Google sign-in end to end (manual check against the owner's Google
-> client). Still to build: provider secret handling and the desktop keychain.
+> (`src/app/(app)/layout.tsx`); and signed-in visitors to `/login` being sent on. A real
+> Google sign-in was checked by hand in a browser. A development-only route,
+> `/api/dev/session`, signs in as the first allowlisted email without Google so agents can
+> check signed-in pages; it responds 404 outside `next dev`. Still to build: provider secret handling and the desktop keychain.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Auth | Better Auth with Google OAuth. The instance is configured, auth tables are migrated, the handler is mounted at `/api/auth/*`, the login page and sign-out button are wired, and `src/proxy.ts` gates pages (see Auth scope and Sessions). A real Google round trip is not yet verified | `implemented` |
-| Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive, whitespace ignored) may sign in. Enforced by Better Auth's `user.validateUserInfo`, which Better Auth calls on create, link and sign-in, before any user, account or session row is written; a rejection returns `not_authorized`, shown on the login page. Tests cover the allowlist decision and, against a real PGlite database, account creation and the no-rows-written case for a rejected email; the link and returning-user paths rely on Better Auth calling the same hook and are not separately tested. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
+| Auth | Better Auth with Google OAuth. The instance is configured, auth tables are migrated, the handler is mounted at `/api/auth/*`, the login page and sign-out button are wired, and `src/proxy.ts` gates pages (see Auth scope and Sessions). A real Google round trip was checked by hand | `implemented` |
+| Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive, whitespace ignored) may sign in. The list is parsed once at startup, and a list with no addresses refuses startup. Enforced by Better Auth's `user.validateUserInfo`, which Better Auth calls on create, link and sign-in, before any user, account or session row is written; a rejection returns `not_authorized`, shown on the login page. Tests cover the allowlist decision and, against a real PGlite database, account creation and the no-rows-written case for a rejected email; the link and returning-user paths rely on Better Auth calling the same hook and are not separately tested. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
 | Auth scope | The web app served by the Next.js server requires a Google sign-in for every page; only an allowlisted account gets in (owner decision, issue #16). This gates access to the web app, not where data lives: the local database stays the system of record (D1). The desktop shell is a static export with no server in front of it, so it is not gated, and desktop sign-in is out of scope for now. Whether the local-first core should someday work signed out in the browser is an open question (section 14) | `implemented` (web); `deferred` (desktop) |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens. `src/proxy.ts` validates each protected request's session against the database through the auth instance, so a forged or expired cookie does not pass. Next.js guidance prefers cookie-only checks in proxy because proxy also runs on prefetches; the database lookup is accepted here because the app is single-user and local, and is revisited if latency shows (D6). Code that must not rely on proxy alone should call `auth.api.getSession` itself | `implemented` |
 | Secrets | Provider API keys and OAuth client secrets live only in server environment variables, never in client bundles or the desktop binary; the server proxies all secret-backed calls | `selected` |
@@ -304,6 +305,12 @@ partial failure quietly. No user-content telemetry, ever.
   with the allowlisted Google account at `http://localhost:3000`, with the four required
   auth settings in `.env.local`); Tauri dev mode for desktop-specific work.
 - Test runner (`implemented`): Vitest, run with `npm test`.
+- Guardrail (`implemented`): `npm run check` runs route typegen, `tsc`, lint, and tests;
+  a pre-commit hook (`.githooks/`, wired by `npm install`) and the GitHub Actions `check`
+  workflow run it. `src/test/architecture-doc.test.ts` keeps this file's sections
+  numbered 1..n with no repeats.
+- Signed-in checks without Google: under `next dev`, `/api/dev/session` creates a real
+  session for the first allowlisted email and sets its cookie.
 - Quality gates (`selected`, as code appears): typecheck, lint, unit tests at the seams
   from section 7, and E2E for the v1 loop, all in CI on PRs.
 - Migrations (`implemented`): Drizzle-generated migrations are committed and applied
@@ -318,7 +325,7 @@ Tauri 2 shell scaffold at `src-tauri/` (no native capabilities yet); the Drizzle
 with committed migrations and a local PGlite dev path (browser PGlite and desktop
 SQLite still pending); the auth foundation - Better Auth with migrated auth tables, the
 Google sign-in route, login page and sign-out button, the email allowlist, and the
-session gate (a real Google round trip still to verify); and the AI SDK seams - DeepSeek provider, single-step
+session gate; and the AI SDK seams - DeepSeek provider, single-step
 assistant hook, MCP client and tool bridge (registry and enforcement still pending).
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
@@ -352,8 +359,7 @@ out-of-scope sections, and change only with the PRD):
   the UI uses (`selected`; MCP client and tool bridge landed, registry pending).
 - **D5** DeepSeek API as the initial provider, behind a provider-neutral adapter (`implemented`).
 - **D6** Better Auth with Google OAuth; every page of the web app requires a session for
-  an allowlisted account, validated against the database in `src/proxy.ts` (`implemented`;
-  a real Google round trip still to verify). The desktop shell is not gated yet
+  an allowlisted account, validated against the database in `src/proxy.ts` (`implemented`). The desktop shell is not gated yet
   (`deferred`). Supersedes the earlier "local core needs no account" wording.
 - **D7** Web-first with a thin Tauri 2 desktop shell (`implemented`; shell scaffolded,
   native capabilities pending).
@@ -413,6 +419,13 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Auth cleanups and agent tooling: the allowlist is parsed once at startup
+  (`src/lib/auth-allowlist.ts`, which also owns the `validateUserInfo` hook), an empty
+  allowlist refuses startup, and config values are no longer trimmed. Adds
+  `npm run check` with a pre-commit hook and CI workflow, a section-numbering test for
+  this file, and the development-only `/api/dev/session` route. Why: catch mechanical
+  mistakes before review, and let agents check signed-in behaviour without Google.
+  Updates sections 9 and 11.
 - 2026-11-24 - Login and sign-out UI from issues #23, #24 and #25 (in progress): the
   login button calls Better Auth's Google social sign-in and passes a `callbackURL` that
   goes through a same-origin path check (rejects absolute URLs, protocol-relative paths,
@@ -424,7 +437,7 @@ link); update section 13 for lasting decisions; write a short ADR in
   Try again." in the login page's live status region. A sign-out button lives in the
   protected `(app)` layout. Signed-in visitors to `/login` are redirected to the
   requested page. Why: a failed or disallowed sign-in should say what happened, and the
-  owner needs a way out. Updates section 9. A real Google round trip is still to verify.
+  owner needs a way out. Updates section 9. A real Google round trip was checked by hand.
 - 2026-11-24 - Session gate from issue #22: `src/proxy.ts` redirects signed-out requests
   for any page to `/login?callbackURL=<requested page>`, validating the session against
   the database (an earlier revision only checked for a cookie). Only `/login`, `/api/*`,

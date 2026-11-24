@@ -2,9 +2,9 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema/auth";
-import { isEmailAllowed } from "./auth-allowlist";
+import { rejectUnlistedEmails } from "./auth-allowlist";
 import { readAuthConfig } from "./auth-config";
-import { NOT_AUTHORIZED_CODE, SIGN_IN_ERROR_PATH } from "./auth-errors";
+import { SIGN_IN_ERROR_PATH } from "./auth-errors";
 
 /**
  * Better Auth foundation instance. Server-side only.
@@ -42,13 +42,7 @@ export const auth = betterAuth({
     errorURL: SIGN_IN_ERROR_PATH,
   },
   user: {
-    validateUserInfo: ({ user }) =>
-      isEmailAllowed(user.email, config.allowedEmail)
-        ? undefined
-        : {
-            error: NOT_AUTHORIZED_CODE,
-            errorDescription: "This Google account is not authorized to sign in.",
-          },
+    validateUserInfo: rejectUnlistedEmails(config.allowlist),
   },
   socialProviders: {
     google: {

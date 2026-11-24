@@ -21,3 +21,10 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Navigation
+
+- Architecture change: update `architecture.md` in the same change, following its section 2 rules (status markers, change log).
+- Review: `CODING_STANDARDS.md` holds the judgement rules; `npm run check` holds the mechanical ones.
+- Dev server: `npm run dev` serves `http://localhost:3000` and is often already running; check the port before starting another. Its log is `.next/dev/logs/next-development.log`.
+- Signed-in checks: with the dev server running, `curl -c jar -L "http://localhost:3000/api/dev/session?callbackURL=/"` signs in as the first allowlisted email (development only; see `src/app/api/dev/session/route.ts`).

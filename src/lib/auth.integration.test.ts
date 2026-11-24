@@ -1,5 +1,6 @@
 import { runWithEndpointContext } from "@better-auth/core/context";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { useAuthTestDatabase } from "@/test/auth-test-database";
 
 /**
  * Runs the real Better Auth instance against an in-memory PGlite database.
@@ -18,26 +19,15 @@ describe("sign-in allowlist against a real database", () => {
   let db: Db;
   let tables: typeof import("@/db/schema/auth");
 
+  useAuthTestDatabase({ allowedEmail: ALLOWLIST });
+
   beforeAll(async () => {
-    vi.stubEnv("BETTER_AUTH_SECRET", "integration-test-secret");
-    vi.stubEnv("GOOGLE_CLIENT_ID", "integration-client-id");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "integration-client-secret");
-    vi.stubEnv("ALLOWED_EMAIL", ALLOWLIST);
-    vi.stubEnv("DATABASE_URL", "memory");
-    vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
-
-    const { runMigrations } = await import("@/db/migrate");
-    await runMigrations();
-
     const client = await import("@/db/client");
     db = client.getDb();
     tables = await import("@/db/schema/auth");
     ({ auth } = await import("@/lib/auth"));
   });
 
-  afterAll(() => {
-    vi.unstubAllEnvs();
-  });
 
   const provisionGoogleUser = async (email: string) => {
     const ctx = await auth.$context;
