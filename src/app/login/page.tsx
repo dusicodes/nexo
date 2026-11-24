@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
+import { signInErrorMessage } from "@/lib/auth-errors";
 import { safeCallbackURL } from "@/lib/safe-callback-url";
 import { GoogleSignIn } from "./_components/google-sign-in";
 
@@ -36,9 +37,12 @@ export default function LoginPage(props: PageProps<"/login">) {
 async function SignInForm({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackURL?: string | string[] }>;
+  searchParams: Promise<{
+    callbackURL?: string | string[];
+    error?: string | string[];
+  }>;
 }) {
-  const { callbackURL } = await searchParams;
+  const { callbackURL, error } = await searchParams;
   const target = safeCallbackURL(callbackURL);
 
   // Already signed in: skip the button and go to the requested page.
@@ -47,5 +51,9 @@ async function SignInForm({
     redirect(target);
   }
 
-  return <GoogleSignIn callbackURL={target} />;
+  const message = signInErrorMessage(
+    typeof error === "string" ? error : undefined,
+  );
+
+  return <GoogleSignIn callbackURL={target} message={message} />;
 }

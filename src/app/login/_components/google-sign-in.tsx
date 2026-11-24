@@ -1,7 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
-import { SIGN_IN_ERROR_PATH } from "@/lib/auth-errors";
+import { SIGN_IN_ERROR_PATH, type SignInErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
@@ -29,11 +29,20 @@ function GoogleIcon(props: React.ComponentProps<"svg">) {
 
 export function GoogleSignIn({
   callbackURL,
+  message = null,
   disabled = false,
 }: {
   callbackURL: string;
+  message?: SignInErrorMessage | null;
   disabled?: boolean;
 }) {
+  const startSignIn = () =>
+    authClient.signIn.social({
+      provider: "google",
+      callbackURL,
+      errorCallbackURL: SIGN_IN_ERROR_PATH,
+    });
+
   return (
     <div className="flex flex-col gap-4">
       <Button
@@ -42,17 +51,32 @@ export function GoogleSignIn({
         size="lg"
         className="w-full"
         disabled={disabled}
-        onClick={() =>
-          authClient.signIn.social({
-            provider: "google",
-            callbackURL,
-            errorCallbackURL: SIGN_IN_ERROR_PATH,
-          })
-        }
+        onClick={startSignIn}
       >
         <GoogleIcon className="mr-2 size-5" />
         Continue with Google
       </Button>
+      {/* Live region: always rendered so screen readers announce errors. */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-center text-sm text-muted-foreground"
+      >
+        {message ? (
+          <>
+            <p>{message.text}</p>
+            {message.offerAnotherAccount ? (
+              <button
+                type="button"
+                onClick={startSignIn}
+                className="mt-1 underline underline-offset-4 hover:text-foreground"
+              >
+                Try another account
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

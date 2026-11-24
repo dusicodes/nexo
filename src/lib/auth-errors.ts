@@ -1,35 +1,35 @@
 /**
- * Where Better Auth sends a failed sign-in: the error code arrives as the
- * `error` query parameter. Used as both onAPIError.errorURL in src/lib/auth.ts
- * and errorCallbackURL in the Google sign-in button.
+ * Where Better Auth sends a failed sign-in: the login page, with the error
+ * code in the `error` query parameter. Used as both onAPIError.errorURL in
+ * src/lib/auth.ts and errorCallbackURL in the Google sign-in button.
  */
-export const SIGN_IN_ERROR_PATH = "/auth/error";
+export const SIGN_IN_ERROR_PATH = "/login";
 
-export type SignInErrorMessage = { title: string; body: string };
+/** The error code src/lib/auth.ts returns for an account off the allowlist. */
+export const NOT_AUTHORIZED_CODE = "not_authorized";
 
-const NOT_AUTHORIZED: SignInErrorMessage = {
-  title: "This Google account can't use nexo",
-  body: "Sign in with the Google account that was set up for this app.",
+export type SignInErrorMessage = {
+  text: string;
+  /** Show a link that lets the owner pick a different Google account. */
+  offerAnotherAccount: boolean;
 };
 
-const CANCELLED: SignInErrorMessage = {
-  title: "Sign-in was cancelled",
-  body: "Nothing was changed. Try again when you're ready.",
-};
-
-const GENERIC: SignInErrorMessage = {
-  title: "Sign-in didn't complete",
-  body: "Something went wrong while signing in. Try again.",
-};
-
-/** Maps a Better Auth error code to a message the owner can act on. */
-export function signInErrorMessage(code: string | undefined): SignInErrorMessage {
-  switch (code) {
-    case "not_authorized":
-      return NOT_AUTHORIZED;
-    case "access_denied":
-      return CANCELLED;
-    default:
-      return GENERIC;
+/**
+ * Maps the login page's `error` query parameter to the message shown there.
+ * A missing parameter shows nothing; any value other than the not-authorized
+ * code, including unknown ones, shows the retry message.
+ */
+export function signInErrorMessage(
+  code: string | undefined,
+): SignInErrorMessage | null {
+  if (code === undefined) {
+    return null;
   }
+  if (code === NOT_AUTHORIZED_CODE) {
+    return {
+      text: "This Google account isn't authorized for nexo",
+      offerAnotherAccount: true,
+    };
+  }
+  return { text: "Sign-in didn't complete. Try again.", offerAnotherAccount: false };
 }

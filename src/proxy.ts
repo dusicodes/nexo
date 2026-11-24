@@ -1,19 +1,23 @@
-import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
-import { signInRedirectPath } from "@/lib/session-gate";
+import { auth } from "@/lib/auth";
+import { isProtectedPath, signInRedirectPath } from "@/lib/session-gate";
 
 /**
  * Sends signed-out requests for protected pages to /login, carrying the
- * requested page as callbackURL. This checks that a session cookie is present;
- * it does not validate the session. Validation belongs with the session gate
- * work in the route handlers.
+ * requested page as callbackURL. The session is validated against the
+ * database through the auth instance, so a forged or expired cookie does not
+ * pass. Proxy runs on the Node.js runtime, which the database client needs.
  */
-export function proxy(request: NextRequest) {
-  const redirect = signInRedirectPath(
-    request.nextUrl.pathname,
-    request.nextUrl.search,
-    getSessionCookie(request.headers) !== null,
-  );
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+
+  // Open paths skip the database lookup entirely.
+  if (!isProtectedPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  const session = await auth.api.getSession({ headers: request.headers });
+  const redirect = signInRedirectPath(pathname, search, session !== null);
 
   if (redirect === null) {
     return NextResponse.next();

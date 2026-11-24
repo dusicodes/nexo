@@ -1,6 +1,4 @@
-import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { SessionPanel } from "./_components/session-panel";
 
 export default function Home() {
   return (
@@ -12,9 +10,6 @@ export default function Home() {
           being built here.
         </p>
       </div>
-      <Suspense fallback={null}>
-        <SessionPanel />
-      </Suspense>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button>Button</Button>
         <Button variant="outline">Outline</Button>

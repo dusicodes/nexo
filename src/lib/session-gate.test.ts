@@ -5,14 +5,14 @@ import {
 } from "@/lib/session-gate";
 
 describe("isProtectedPath", () => {
-  it.each(["/", "/projects", "/projects/42", "/notes?x=1"])(
+  it.each(["/", "/projects", "/projects/42"])(
     "protects the app page %s",
     (pathname) => {
       expect(isProtectedPath(pathname)).toBe(true);
     },
   );
 
-  it.each(["/login", "/login/", "/auth/error", "/api/auth/callback/google", "/api/auth/get-session", "/favicon.ico", "/_next/static/chunk.js"])(
+  it.each(["/login", "/login/", "/api/auth/callback/google", "/api/auth/get-session", "/favicon.ico", "/_next/static/chunk.js"])(
     "leaves %s open",
     (pathname) => {
       expect(isProtectedPath(pathname)).toBe(false);
