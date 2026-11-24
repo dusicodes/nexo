@@ -202,13 +202,14 @@ pattern is the same one the daily planning loop uses.
 > **Status:** This section describes selected and proposed security design. Better Auth is
 > configured with the Drizzle adapter and its tables are migrated; the email allowlist gate
 > is implemented in `src/lib/auth.ts`; the Better Auth handler is mounted at
-> `src/app/api/auth/[...all]/route.ts`, so the Google callback is served locally (a real
+> `src/app/api/auth/[...all]/route.ts`, so the Google callback is served locally; the login
+> button starts Better Auth's Google sign-in and returns to a same-origin return path (a real
 > Google sign-in is not yet verified end to end); the local database exists; provider secret
 > handling and the desktop keychain remain to be built.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured, auth tables migrated, handler mounted at `/api/auth/*`; session gate and login UI pending) | `selected` |
+| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured, auth tables migrated, handler mounted at `/api/auth/*`; login button wired; session gate pending) | `selected` |
 | Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive) may sign in. Enforced by Better Auth's `user.validateUserInfo` on create, link and sign-in, before any user, account or session row is written. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
 | Auth scope | The local-first core (tasks, notes, reading) works without signing in; auth is only for server-mediated capabilities | `selected` |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens | `selected` |
@@ -391,6 +392,13 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Google sign-in button wired from issue #23: the login button calls Better
+  Auth's Google social sign-in, and the login page passes a `callbackURL` query value
+  through a same-origin path check (rejects absolute URLs, protocol-relative paths, and any
+  whitespace or control characters) before it is used as the return target. Why: the
+  owner returns to the page they asked for after signing in, without an open redirect.
+  Updates section 9 (status note, auth row). The session gate and a real Google round trip
+  are still pending.
 - 2026-11-24 - Sign-in allowlist enforced from issue #20: `ALLOWED_EMAIL` is a
   comma-separated list matched case-insensitively, applied through Better Auth's
   `user.validateUserInfo` before any user, account or session row is written. Why: the app

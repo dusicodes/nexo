@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Info } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
@@ -27,42 +26,21 @@ function GoogleIcon(props: React.ComponentProps<"svg">) {
   );
 }
 
-export function GoogleSignIn() {
-  const [status, setStatus] = useState<string | null>(null);
-
+export function GoogleSignIn({ callbackURL }: { callbackURL: string }) {
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-center text-xs leading-5 text-muted-foreground">
-        This is a UI preview. Google sign-in is not yet connected.
-      </p>
-
       <Button
         type="button"
         variant="outline"
         size="lg"
         className="w-full"
         onClick={() =>
-          setStatus(
-            "Google sign-in is not connected yet. This screen is a UI preview.",
-          )
+          authClient.signIn.social({ provider: "google", callbackURL })
         }
-        aria-describedby="google-sign-in-status"
       >
         <GoogleIcon className="mr-2 size-5" />
         Continue with Google
       </Button>
-
-      {status && (
-        <div
-          id="google-sign-in-status"
-          role="status"
-          aria-live="polite"
-          className="flex items-start gap-2 rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground"
-        >
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{status}</span>
-        </div>
-      )}
     </div>
   );
 }

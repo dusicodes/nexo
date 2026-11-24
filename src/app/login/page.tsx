@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { safeCallbackURL } from "@/lib/safe-callback-url";
 import { GoogleSignIn } from "./_components/google-sign-in";
 
 export const metadata: Metadata = {
@@ -6,7 +7,13 @@ export const metadata: Metadata = {
   description: "Sign in to nexo with Google.",
 };
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ callbackURL?: string | string[] }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { callbackURL } = await searchParams;
+
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8">
@@ -18,7 +25,7 @@ export default function LoginPage() {
             A calm, local-first workspace. Sign in to continue.
           </p>
         </div>
-        <GoogleSignIn />
+        <GoogleSignIn callbackURL={safeCallbackURL(callbackURL)} />
       </div>
     </main>
   );
