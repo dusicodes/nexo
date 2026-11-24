@@ -7,7 +7,8 @@ import { SignOutButton } from "./sign-out-button";
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <header className="flex justify-end px-6 py-3">
+      {/* pr-16 leaves room for the theme toggle fixed in the root layout. */}
+      <header className="flex justify-end py-3 pl-6 pr-16">
         <SignOutButton />
       </header>
       {children}
