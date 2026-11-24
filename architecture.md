@@ -201,13 +201,14 @@ pattern is the same one the daily planning loop uses.
 
 > **Status:** This section describes selected and proposed security design. Better Auth is
 > configured with the Drizzle adapter and its tables are migrated; the email allowlist gate
-> is implemented in `src/lib/auth.ts` (no OAuth route or sign-in flow yet, so it is not yet
-> exercised end to end); the local database exists; provider secret handling and the desktop
-> keychain remain to be built.
+> is implemented in `src/lib/auth.ts`; the Better Auth handler is mounted at
+> `src/app/api/auth/[...all]/route.ts`, so the Google callback is served locally (a real
+> Google sign-in is not yet verified end to end); the local database exists; provider secret
+> handling and the desktop keychain remain to be built.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured and auth tables migrated; OAuth flow and route pending) | `selected` |
+| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured, auth tables migrated, handler mounted at `/api/auth/*`; session gate and login UI pending) | `selected` |
 | Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive) may sign in. Enforced by Better Auth's `user.validateUserInfo` on create, link and sign-in, before any user, account or session row is written. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
 | Auth scope | The local-first core (tasks, notes, reading) works without signing in; auth is only for server-mediated capabilities | `selected` |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens | `selected` |
