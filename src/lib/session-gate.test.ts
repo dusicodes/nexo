@@ -12,7 +12,7 @@ describe("isProtectedPath", () => {
     },
   );
 
-  it.each(["/login", "/login/", "/api/auth/callback/google", "/api/auth/get-session", "/favicon.ico", "/_next/static/chunk.js"])(
+  it.each(["/login", "/login/", "/auth/error", "/api/auth/callback/google", "/api/auth/get-session", "/favicon.ico", "/_next/static/chunk.js"])(
     "leaves %s open",
     (pathname) => {
       expect(isProtectedPath(pathname)).toBe(false);

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { auth } from "@/lib/auth";
 import { safeCallbackURL } from "@/lib/safe-callback-url";
 import { GoogleSignIn } from "./_components/google-sign-in";
 
@@ -36,5 +39,13 @@ async function SignInForm({
   searchParams: Promise<{ callbackURL?: string | string[] }>;
 }) {
   const { callbackURL } = await searchParams;
-  return <GoogleSignIn callbackURL={safeCallbackURL(callbackURL)} />;
+  const target = safeCallbackURL(callbackURL);
+
+  // Already signed in: skip the button and go to the requested page.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) {
+    redirect(target);
+  }
+
+  return <GoogleSignIn callbackURL={target} />;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { SIGN_IN_ERROR_PATH } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
@@ -42,7 +43,11 @@ export function GoogleSignIn({
         className="w-full"
         disabled={disabled}
         onClick={() =>
-          authClient.signIn.social({ provider: "google", callbackURL })
+          authClient.signIn.social({
+            provider: "google",
+            callbackURL,
+            errorCallbackURL: SIGN_IN_ERROR_PATH,
+          })
         }
       >
         <GoogleIcon className="mr-2 size-5" />

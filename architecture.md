@@ -204,8 +204,10 @@ pattern is the same one the daily planning loop uses.
 > is implemented in `src/lib/auth.ts`; the Better Auth handler is mounted at
 > `src/app/api/auth/[...all]/route.ts`, so the Google callback is served locally; the login
 > button starts Better Auth's Google sign-in and returns to a same-origin return path; the
-> proxy in `src/proxy.ts` gates every page except login, the auth API, and static files (a
-> real Google sign-in is not yet verified end to end); the local database exists; provider secret
+> proxy in `src/proxy.ts` gates every page except login, the sign-in error page, the auth
+> API, and static files; failed sign-ins land on `/auth/error` with a message for the code;
+> the home page shows the signed-in account with a sign-out button, and signed-in visitors
+> to `/login` are sent on (a real Google sign-in is not yet verified end to end); the local database exists; provider secret
 > handling and the desktop keychain remain to be built.
 
 | Aspect | Direction | Status |
@@ -393,6 +395,12 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Sign-in error page and signed-in state from issues #23 and #24 (in progress):
+  `/auth/error` maps Better Auth error codes to messages (`src/lib/auth-errors.ts`);
+  `onAPIError.errorURL` and the button's `errorCallbackURL` both point there. The home
+  page shows the signed-in account and a sign-out button. Signed-in visitors to `/login`
+  are redirected to the requested page. Why: a failed or disallowed sign-in should say
+  what happened, and the owner should be able to tell they are signed in.
 - 2026-11-24 - Session gate from issue #23: `src/proxy.ts` redirects signed-out requests
   for any page to `/login?callbackURL=<requested page>`. Only `/login`, `/api/*`, and
   Next.js static assets are exempt. Why: the return target needs a protected page to

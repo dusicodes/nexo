@@ -3,11 +3,11 @@
  * tested directly. src/proxy.ts applies them to each request.
  *
  * Every page is protected by default. Only the first path segment in
- * OPEN_SEGMENTS is exempt: the login page, the Better Auth handler, and
- * Next.js internals and static files.
+ * OPEN_SEGMENTS is exempt: the login page, the sign-in error page, the Better
+ * Auth handler, and Next.js internals and static files.
  */
 
-const OPEN_SEGMENTS = new Set(["login", "api", "_next", "favicon.ico"]);
+const OPEN_SEGMENTS = new Set(["login", "auth", "api", "_next", "favicon.ico"]);
 
 export function isProtectedPath(pathname: string): boolean {
   const path = pathname.split("?")[0] ?? "";

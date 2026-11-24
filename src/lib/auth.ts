@@ -4,6 +4,7 @@ import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema/auth";
 import { isEmailAllowed } from "./auth-allowlist";
 import { readAuthConfig } from "./auth-config";
+import { SIGN_IN_ERROR_PATH } from "./auth-errors";
 
 /**
  * Better Auth foundation instance. Server-side only.
@@ -35,6 +36,11 @@ export const auth = betterAuth({
     provider: "pg",
     schema: authSchema,
   }),
+  onAPIError: {
+    // Thrown sign-in errors, such as the allowlist rejection, land on the
+    // app's error page with the code as ?error=.
+    errorURL: SIGN_IN_ERROR_PATH,
+  },
   user: {
     validateUserInfo: ({ user }) =>
       isEmailAllowed(user.email, config.allowedEmail)
