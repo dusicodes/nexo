@@ -26,7 +26,13 @@ function GoogleIcon(props: React.ComponentProps<"svg">) {
   );
 }
 
-export function GoogleSignIn({ callbackURL }: { callbackURL: string }) {
+export function GoogleSignIn({
+  callbackURL,
+  disabled = false,
+}: {
+  callbackURL: string;
+  disabled?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-4">
       <Button
@@ -34,6 +40,7 @@ export function GoogleSignIn({ callbackURL }: { callbackURL: string }) {
         variant="outline"
         size="lg"
         className="w-full"
+        disabled={disabled}
         onClick={() =>
           authClient.signIn.social({ provider: "google", callbackURL })
         }
