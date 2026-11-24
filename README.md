@@ -205,7 +205,7 @@ are implemented yet.
 ```sh
 nvm use
 npm install
-cp .env.example .env.local   # fill in at least BETTER_AUTH_SECRET
+cp .env.example .env.local   # fill in the four required auth settings
 npm run db:migrate           # creates the local PGlite database (.data/, gitignored)
 npm run dev
 ```
@@ -245,10 +245,13 @@ runs the full web app against the dev server.
 ### Auth
 
 Better Auth is configured in `src/lib/auth.ts` with the Drizzle adapter; auth
-tables migrate with everything else. Google OAuth registers automatically when
-`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. No secrets are
-committed. The API route that mounts auth and the sign-in UI arrive in the
-auth slice.
+tables migrate with everything else. `BETTER_AUTH_SECRET`,
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `ALLOWED_EMAIL` are required:
+the app refuses to start, naming the missing setting, if any is unset or
+empty (`src/lib/auth-config.ts`, checked from `src/instrumentation.ts`). No
+secrets are committed. The auth handler is mounted at `/api/auth/*`, `src/proxy.ts`
+sends signed-out requests for every page to `/login`, and the login page signs in with
+Google for allowlisted accounts only.
 
 ## Feedback
 

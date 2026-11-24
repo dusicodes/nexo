@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Info } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { SIGN_IN_ERROR_PATH, type SignInErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
@@ -27,42 +27,56 @@ function GoogleIcon(props: React.ComponentProps<"svg">) {
   );
 }
 
-export function GoogleSignIn() {
-  const [status, setStatus] = useState<string | null>(null);
+export function GoogleSignIn({
+  callbackURL,
+  message = null,
+  disabled = false,
+}: {
+  callbackURL: string;
+  message?: SignInErrorMessage | null;
+  disabled?: boolean;
+}) {
+  const startSignIn = () =>
+    authClient.signIn.social({
+      provider: "google",
+      callbackURL,
+      errorCallbackURL: SIGN_IN_ERROR_PATH,
+    });
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-center text-xs leading-5 text-muted-foreground">
-        This is a UI preview. Google sign-in is not yet connected.
-      </p>
-
       <Button
         type="button"
         variant="outline"
         size="lg"
         className="w-full"
-        onClick={() =>
-          setStatus(
-            "Google sign-in is not connected yet. This screen is a UI preview.",
-          )
-        }
-        aria-describedby="google-sign-in-status"
+        disabled={disabled}
+        onClick={startSignIn}
       >
         <GoogleIcon className="mr-2 size-5" />
         Continue with Google
       </Button>
-
-      {status && (
-        <div
-          id="google-sign-in-status"
-          role="status"
-          aria-live="polite"
-          className="flex items-start gap-2 rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground"
-        >
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{status}</span>
-        </div>
-      )}
+      {/* Live region: always rendered so screen readers announce errors. */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-center text-sm text-muted-foreground"
+      >
+        {message ? (
+          <>
+            <p>{message.text}</p>
+            {message.offerAnotherAccount ? (
+              <button
+                type="button"
+                onClick={startSignIn}
+                className="mt-1 underline underline-offset-4 hover:text-foreground"
+              >
+                Try another account
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

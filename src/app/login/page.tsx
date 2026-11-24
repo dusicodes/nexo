@@ -1,4 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { auth } from "@/lib/auth";
+import { signInErrorMessage } from "@/lib/auth-errors";
+import { safeCallbackURL } from "@/lib/safe-callback-url";
 import { GoogleSignIn } from "./_components/google-sign-in";
 
 export const metadata: Metadata = {
@@ -6,7 +12,7 @@ export const metadata: Metadata = {
   description: "Sign in to nexo with Google.",
 };
 
-export default function LoginPage() {
+export default function LoginPage(props: PageProps<"/login">) {
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8">
@@ -18,8 +24,36 @@ export default function LoginPage() {
             A calm, local-first workspace. Sign in to continue.
           </p>
         </div>
-        <GoogleSignIn />
+        {/* searchParams is read inside the boundary so the page can prerender
+            its shell under Cache Components. */}
+        <Suspense fallback={<GoogleSignIn callbackURL="/" disabled />}>
+          <SignInForm searchParams={props.searchParams} />
+        </Suspense>
       </div>
     </main>
   );
+}
+
+async function SignInForm({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    callbackURL?: string | string[];
+    error?: string | string[];
+  }>;
+}) {
+  const { callbackURL, error } = await searchParams;
+  const target = safeCallbackURL(callbackURL);
+
+  // Already signed in: skip the button and go to the requested page.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) {
+    redirect(target);
+  }
+
+  const message = signInErrorMessage(
+    typeof error === "string" ? error : undefined,
+  );
+
+  return <GoogleSignIn callbackURL={target} message={message} />;
 }

@@ -10,7 +10,11 @@
     "tauri": "tauri",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run",
+    "typecheck": "next typegen && tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.84",
@@ -44,6 +48,7 @@
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
