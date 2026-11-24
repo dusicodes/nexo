@@ -7,12 +7,8 @@ export const metadata: Metadata = {
   description: "Sign in to nexo with Google.",
 };
 
-type LoginPageProps = {
-  searchParams: Promise<{ callbackURL?: string | string[] }>;
-};
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { callbackURL } = await searchParams;
+export default async function LoginPage(props: PageProps<"/login">) {
+  const { callbackURL } = await props.searchParams;
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-12">

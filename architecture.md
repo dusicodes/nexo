@@ -203,13 +203,14 @@ pattern is the same one the daily planning loop uses.
 > configured with the Drizzle adapter and its tables are migrated; the email allowlist gate
 > is implemented in `src/lib/auth.ts`; the Better Auth handler is mounted at
 > `src/app/api/auth/[...all]/route.ts`, so the Google callback is served locally; the login
-> button starts Better Auth's Google sign-in and returns to a same-origin return path (a real
-> Google sign-in is not yet verified end to end); the local database exists; provider secret
+> button starts Better Auth's Google sign-in and returns to a same-origin return path; the
+> proxy in `src/proxy.ts` gates every page except login, the auth API, and static files (a
+> real Google sign-in is not yet verified end to end); the local database exists; provider secret
 > handling and the desktop keychain remain to be built.
 
 | Aspect | Direction | Status |
 | --- | --- | --- |
-| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured, auth tables migrated, handler mounted at `/api/auth/*`; login button wired; session gate pending) | `selected` |
+| Auth | Better Auth with Google OAuth for server capabilities and provider integrations (instance configured, auth tables migrated, handler mounted at `/api/auth/*`; login button wired; `src/proxy.ts` redirects signed-out pages to `/login?callbackURL=…`, checking for a session cookie only; session validation pending) | `selected` |
 | Sign-in allowlist | Only Google accounts whose email is in `ALLOWED_EMAIL` (comma-separated, case-insensitive) may sign in. Enforced by Better Auth's `user.validateUserInfo` on create, link and sign-in, before any user, account or session row is written. Single-user intent: the list exists for the owner's own accounts; multi-user is a deliberate future change | `implemented` |
 | Auth scope | The local-first core (tasks, notes, reading) works without signing in; auth is only for server-mediated capabilities | `selected` |
 | Sessions | Managed by Better Auth with httpOnly cookies; the client never sees OAuth tokens | `selected` |
@@ -392,6 +393,13 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Session gate from issue #23: `src/proxy.ts` redirects signed-out requests
+  for any page to `/login?callbackURL=<requested page>`. Only `/login`, `/api/*`, and
+  Next.js static assets are exempt. Why: the return target needs a protected page to
+  return from, and protecting by default means new pages are gated without a list update.
+  The check only looks for a Better Auth session cookie; validating the session is still
+  pending. Open point: the "Auth scope" row above says the local-first core works without
+  signing in, which this gate contradicts. Resolve by narrowing the gate or revising that row.
 - 2026-11-24 - Google sign-in button wired from issue #23: the login button calls Better
   Auth's Google social sign-in, and the login page passes a `callbackURL` query value
   through a same-origin path check (rejects absolute URLs, protocol-relative paths, and any
