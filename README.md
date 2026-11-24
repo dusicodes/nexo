@@ -206,8 +206,7 @@ are implemented yet.
 nvm use
 npm install
 cp .env.example .env.local   # fill in the four required auth settings
-npm run db:migrate           # creates the local PGlite database (.data/, gitignored)
-npm run dev
+npm run dev                  # migrates .data/nexo, then serves it through pglite-server
 ```
 
 Open http://localhost:3000. Generate the auth secret with
@@ -217,7 +216,7 @@ environment variables are set, as documented in `.env.example`.
 ### Commands
 
 ```sh
-npm run dev            # web dev server with HMR (Turbopack)
+npm run dev            # migrate, start pglite-server on .data/nexo, then next dev (HMR, Turbopack)
 npm run build          # production web build (serverful: API routes, server components)
 npm run start          # serve the production build
 npm run lint           # ESLint

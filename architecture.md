@@ -128,8 +128,9 @@ Boundary rules:
 | --- | --- | --- |
 | Schema source of truth | Drizzle ORM; migrations generated and committed from it | `implemented` |
 | Browser persistence | PGlite (Postgres in WASM) | `selected` |
+| Local server persistence (development) | One PGlite directory (`.data/nexo`) owned by a single `pglite-server` process, which `npm run dev` starts before `next dev`; Next.js connects to it over the Postgres protocol with `pg`. Next.js loads server code in several isolated contexts (proxy, route handlers, a rendering worker thread), so opening PGlite in-process would create one instance per context on the same directory, and competing writers corrupt it. `src/db/client.ts` refuses in-process PGlite when `NEXT_RUNTIME` is set | `implemented` |
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
-| Server data path | Same Drizzle schema against a real Postgres (self-hosted single-user deployment or future sync hub). Connection path implemented; not yet exercised against a live server | `implemented` |
+| Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
@@ -301,9 +302,10 @@ partial failure quietly. No user-content telemetry, ever.
   app and replaces the earlier `desktop/` plan: the shell is a single directory, and a
   `desktop/` wrapper would only add an empty layer. Shared code moves to `packages/`
   only when the shell genuinely needs it (`proposed`).
-- Local loop: run the web app in a browser against PGlite for fast iteration (sign in
-  with the allowlisted Google account at `http://localhost:3000`, with the four required
-  auth settings in `.env.local`); Tauri dev mode for desktop-specific work.
+- Local loop: `npm run dev` applies migrations, starts `pglite-server` on `.data/nexo`
+  (port 54329), and runs `next dev` with its `DATABASE_URL`. Sign in with the
+  allowlisted Google account at `http://localhost:3000`, with the four required auth
+  settings in `.env.local`. Tauri dev mode for desktop-specific work.
 - Test runner (`implemented`): Vitest, run with `npm test`.
 - Guardrail (`implemented`): `npm run check` runs route typegen, `tsc`, lint, and tests;
   a pre-commit hook (`.githooks/`, wired by `npm install`) and the GitHub Actions `check`
@@ -314,8 +316,9 @@ partial failure quietly. No user-content telemetry, ever.
 - Quality gates (`selected`, as code appears): typecheck, lint, unit tests at the seams
   from section 7, and E2E for the v1 loop, all in CI on PRs.
 - Migrations (`implemented`): Drizzle-generated migrations are committed and applied
-  with `npm run db:migrate` (PGlite or Postgres). Automatic application at app start
-  arrives with the repository layer.
+  with `npm run db:migrate` (PGlite or Postgres); `npm run dev` runs it before
+  `pglite-server` takes the directory. Run it by hand only while the dev server is
+  stopped, since it opens `.data/nexo` directly.
 
 ## 12. Current foundation versus planned product
 
@@ -419,6 +422,18 @@ link); update section 13 for lasting decisions; write a short ADR in
 
 **Change log:**
 
+- 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
+  server every page failed with "Failed to get session"; PGlite aborted on every query
+  (`Aborted()`). Cause: Next.js loads server code in isolated contexts (proxy and route
+  handlers on the main thread, rendering on a worker thread) that share no memory, so
+  each opened its own PGlite on `.data/nexo`; with two or more writers, stopping the
+  process left the directory unreadable (reproduced 3/3; one writer 0/3). Fix:
+  `npm run dev` runs `pglite-server` as the only owner and Next.js connects over the
+  Postgres protocol; the client moves from postgres.js to `pg`, because postgres.js
+  splits a query across writes and fails through pglite-server's multiplexer
+  ("bind message supplies N parameters"); in-process PGlite is refused inside Next.js.
+  PGlite upgraded to 0.6.0 (required by `@electric-sql/pglite-socket`). Updates
+  sections 6 and 11.
 - 2026-11-24 - Auth cleanups and agent tooling: the allowlist is parsed once at startup
   (`src/lib/auth-allowlist.ts`, which also owns the `validateUserInfo` hook), an empty
   allowlist refuses startup, and config values are no longer trimmed. Adds
