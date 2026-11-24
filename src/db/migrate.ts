@@ -1,9 +1,9 @@
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import {
   migrate as migratePostgres,
-} from "drizzle-orm/postgres-js/migrator";
+} from "drizzle-orm/node-postgres/migrator";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { fileURLToPath } from "node:url";
 import { getDb, getDbKind } from "./client";
 import type * as schema from "./schema";
@@ -25,7 +25,7 @@ export async function runMigrations(): Promise<void> {
       migrationsFolder: "./drizzle",
     });
   } else {
-    await migratePostgres(db as PostgresJsDatabase<typeof schema>, {
+    await migratePostgres(db as NodePgDatabase<typeof schema>, {
       migrationsFolder: "./drizzle",
     });
   }

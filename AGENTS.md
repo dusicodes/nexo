@@ -26,5 +26,5 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 
 - Architecture change: update `architecture.md` in the same change, following its section 2 rules (status markers, change log).
 - Review: `CODING_STANDARDS.md` holds the judgement rules; `npm run check` holds the mechanical ones.
-- Dev server: `npm run dev` serves `http://localhost:3000` and is often already running; check the port before starting another. Its log is `.next/dev/logs/next-development.log`.
+- Dev server: `npm run dev` migrates, then starts pglite-server (sole owner of `.data/nexo`) running `next dev` on `http://localhost:3000`. It is often already running; check the port before starting another. Its log is `.next/dev/logs/next-development.log`. Never open `.data/nexo` from a second process while it runs (no `db:migrate`, no plain `next dev`).
 - Signed-in checks: with the dev server running, `curl -c jar -L "http://localhost:3000/api/dev/session?callbackURL=/"` signs in as the first allowlisted email (development only; see `src/app/api/dev/session/route.ts`).
