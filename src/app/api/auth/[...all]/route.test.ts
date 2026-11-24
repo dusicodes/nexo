@@ -38,9 +38,11 @@ describe("auth route handler", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
+    // No cookie was sent, so the session is null (signed out).
+    expect(await response.json()).toBeNull();
   });
 
-  it("serves the Google callback path and redirects a failed callback", async () => {
+  it("routes the Google callback path to Better Auth, which redirects a bogus callback", async () => {
     const response = await route.GET(
       new Request(`${BASE}/api/auth/callback/google?error=access_denied`),
     );

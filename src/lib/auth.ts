@@ -18,8 +18,8 @@ import { readAuthConfig } from "./auth-config";
  *   user.validateUserInfo, which Better Auth calls before it writes any user,
  *   account or session row.
  *
- * The Next.js API route that mounts this instance (app/api/auth/[...all])
- * is added in the auth slice; this file is the configuration seam.
+ * The Next.js API route that mounts this instance (app/api/auth/[...all]/route.ts)
+ * serves the HTTP handler; this file is the configuration seam.
  */
 
 const config = readAuthConfig();
@@ -30,7 +30,7 @@ const authSchema = { user, session, account, verification };
 
 export const auth = betterAuth({
   secret: config.secret,
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   database: drizzleAdapter(getDb(), {
     provider: "pg",
     schema: authSchema,
