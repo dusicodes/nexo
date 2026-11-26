@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "cn";
 import { Trash2 } from "lucide-react";
+import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
 import type { TaskSnapshot, TodayTask } from "@/tasks/tasks";
 import { DetailsText } from "./details-text";
@@ -12,6 +13,7 @@ import {
   loadToday,
   renameTask,
   restoreTask,
+  setTaskChecklistItem,
   setTaskDetails,
 } from "./today-actions";
 
@@ -206,6 +208,27 @@ export function Today() {
     );
   };
 
+  // Ticks or unticks a Checklist item on the page at once, then on the server;
+  // if that fails, the line goes back to how it was (unless it has since been
+  // edited into something that is no longer a Checklist item).
+  const tickItem = (id: string, lineIndex: number, ticked: boolean) => {
+    const retick = (to: boolean) =>
+      updateTasks((tasks) =>
+        tasks.map((task) => {
+          if (task.id !== id || readDetails(task.details)[lineIndex]?.kind !== "checklist") {
+            return task;
+          }
+          return { ...task, details: tickChecklistItem(task.details, lineIndex, to) };
+        }),
+      );
+    setError(null);
+    retick(ticked);
+    enqueue(id, () => setTaskChecklistItem(id, lineIndex, ticked)).catch(() => {
+      retick(!ticked);
+      setError("Couldn't save that Checklist item. Try again.");
+    });
+  };
+
   // Takes the Task off the page at once and deletes it on the server.
   const deleteFromPage = (task: ShownTask): Promise<TaskSnapshot> | null => {
     const index = shown?.tasks.findIndex((shownTask) => shownTask.id === task.id) ?? -1;
@@ -285,6 +308,7 @@ export function Today() {
               onDetailsOpened={() => setOpenDetailsOf(null)}
               onTitleChange={(title) => saveTitle(task.id, title)}
               onDetailsChange={(details) => saveDetails(task.id, details)}
+              onChecklistItemTick={(lineIndex, ticked) => tickItem(task.id, lineIndex, ticked)}
               onDelete={() => deleteWithUndo(task)}
               onEmptied={() => {
                 deleteEmptied(task);
@@ -412,6 +436,10 @@ function fitHeight(textarea: HTMLTextAreaElement) {
  * Shift+Enter in them starts another line, Enter or Esc ends the edit (Esc
  * putting back the Details from before it), and Backspace in empty Details
  * returns to the title.
+ *
+ * A Details line starting with "[] " (or "[ ] ") shows as a Checklist item
+ * with its own checkbox once the edit ends; "[x] " is a ticked one. Ticking
+ * one only rewrites that line; the Task itself stays open.
  */
 function TaskLine({
   task,
@@ -419,6 +447,7 @@ function TaskLine({
   onDetailsOpened,
   onTitleChange,
   onDetailsChange,
+  onChecklistItemTick,
   onDelete,
   onEmptied,
 }: {
@@ -428,6 +457,7 @@ function TaskLine({
   onDetailsOpened: () => void;
   onTitleChange: (title: string) => void;
   onDetailsChange: (details: string) => void;
+  onChecklistItemTick: (lineIndex: number, ticked: boolean) => void;
   onDelete: () => void;
   onEmptied: () => void;
 }) {
@@ -470,13 +500,14 @@ function TaskLine({
   };
 
   // Ends the Details edit once. Empty lines left at the end (from Shift+Enter
-  // with nothing typed after it) are dropped; everything else stays as typed.
+  // with nothing typed after it) are dropped, and "[ ] " becomes "[] " as the
+  // Tasks module saves it; everything else stays as typed.
   const endDetailsEditing = (value: string, { refocus }: { refocus: boolean }) => {
     if (detailsEdit === null || detailsEditEnded.current) {
       return;
     }
     detailsEditEnded.current = true;
-    detailsSave.saveNow(value.replace(/\n+$/, ""));
+    detailsSave.saveNow(normaliseDetails(value.replace(/\n+$/, "")));
     setDetailsEdit(null);
     if (refocus) {
       requestAnimationFrame(() => titleButton.current?.focus());
@@ -593,17 +624,39 @@ function TaskLine({
           />
         ) : (
           details !== "" && (
-            <p
+            <div
               data-details
               className="cursor-text text-sm leading-6 break-words whitespace-pre-wrap text-muted-foreground"
               onClick={(event) => {
-                if (!task.saving && !(event.target as HTMLElement).closest("a")) {
+                if (!task.saving && !(event.target as HTMLElement).closest("a, input")) {
                   startDetailsEditing({ newLine: false });
                 }
               }}
             >
-              <DetailsText details={details} />
-            </p>
+              {readDetails(details).map((line, lineIndex) =>
+                line.kind === "checklist" ? (
+                  // Not a <label>: clicking the text edits the Details, only the box ticks.
+                  <div key={lineIndex} className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={line.ticked}
+                      disabled={task.saving}
+                      aria-label={`Checklist item: ${line.text}`}
+                      className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
+                      onChange={(event) => onChecklistItemTick(lineIndex, event.target.checked)}
+                    />
+                    <span className={cn("min-w-0", line.ticked && "line-through opacity-70")}>
+                      <DetailsText details={line.text} />
+                    </span>
+                  </div>
+                ) : (
+                  // An empty line keeps its height, as it did in the plain text.
+                  <p key={lineIndex} className="min-h-6">
+                    <DetailsText details={line.text} />
+                  </p>
+                ),
+              )}
+            </div>
           )
         )}
       </div>

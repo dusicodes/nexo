@@ -132,7 +132,7 @@ Boundary rules:
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
 | Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
-| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Tested against in-memory PGlite with the real migrations | `implemented` |
+| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Checklist items live inside the `details` text as `[] `/`[x] ` line markers, read by pure functions in `src/tasks/details.ts` that the page shares (issue #34). Tested against in-memory PGlite with the real migrations | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
@@ -340,8 +340,9 @@ session gate; and the AI SDK seams - DeepSeek provider, single-step
 assistant hook, MCP client and tool bridge (registry and enforcement still pending).
 The first product slice has started: the signed-in home page is Today, where the owner
 writes Tasks for the day (issue #35, part of spec #29), edits their titles in place and
-deletes them with undo (issue #32), and adds plain-text Details under them (issue #33);
-completing, carry-over and Checklist items follow in later tickets.
+deletes them with undo (issue #32), adds plain-text Details under them (issue #33), and
+ticks Checklist items within those Details (issue #34); completing and carry-over follow in
+later tickets.
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -463,6 +464,17 @@ link); update section 13 for lasting decisions; write a short ADR in
   them are links opening in a new tab, and Backspace on an emptied title deletes with the
   undo toast when Details would be lost. The page behaviour has no automated test; it was
   checked by hand in a browser. Updates section 12.
+- 2026-11-26 - Checklist items (issue #34): Details lines starting with `[] ` (or `[ ] `,
+  saved as `[] `) are open Checklist items and `[x] ` ticked ones, kept in the `details`
+  text rather than a table, so the schema is unchanged. Pure functions in
+  `src/tasks/details.ts` read and tick them and are shared by the Tasks module and the
+  page; the module gains `setChecklistItem`, which rewrites only that line's marker,
+  refuses any other line, and never completes the Task, behind a session-checked Server
+  Function. Completing a Task does not exist yet (issue #30), so "completing a Task
+  leaves its Checklist items as they are" is untested until then. The page shows a
+  checkbox for each Checklist item once a Details edit ends (not while typing).
+  The page behaviour has no automated test; it was checked by hand in a browser. Updates
+  sections 6 and 12.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

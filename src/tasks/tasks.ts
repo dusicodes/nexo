@@ -1,7 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
+import { normaliseDetails, tickChecklistItem } from "./details";
 import { isLocalDate, type LocalDate } from "./local-date";
+
+export { NotAChecklistItemError } from "./details";
 
 /**
  * The Tasks module: the only code that reads or writes Tasks (GLOSSARY.md).
@@ -98,17 +101,45 @@ export async function rename(id: string, title: string): Promise<TodayTask> {
   return toTodayTask(renamed);
 }
 
-/** Replaces a Task's Details. They are kept exactly as typed, blank included. */
+/**
+ * Replaces a Task's Details. They are kept exactly as typed, blank included,
+ * except that a line starting with "[ ] " is saved as a "[] " Checklist item.
+ */
 export async function setDetails(id: string, details: string): Promise<TodayTask> {
   const [updated] = await getDb()
     .update(tasks)
-    .set({ details, updatedAt: new Date() })
+    .set({ details: normaliseDetails(details), updatedAt: new Date() })
     .where(eq(tasks.id, id))
     .returning();
   if (updated === undefined) {
     throw new TaskNotFoundError(id);
   }
   return toTodayTask(updated);
+}
+
+/**
+ * Ticks or unticks the Checklist item on line `lineIndex` (from 0) of a Task's
+ * Details, rewriting only that line's marker. It refuses a line that is not a
+ * Checklist item, and never completes or reopens the Task.
+ */
+export async function setChecklistItem(
+  id: string,
+  lineIndex: number,
+  ticked: boolean,
+): Promise<TodayTask> {
+  // Read and write in one transaction, so a Details save cannot land between them.
+  return getDb().transaction(async (tx) => {
+    const [task] = await tx.select().from(tasks).where(eq(tasks.id, id)).for("update");
+    if (task === undefined) {
+      throw new TaskNotFoundError(id);
+    }
+    const [updated] = await tx
+      .update(tasks)
+      .set({ details: tickChecklistItem(task.details, lineIndex, ticked), updatedAt: new Date() })
+      .where(eq(tasks.id, id))
+      .returning();
+    return toTodayTask(updated);
+  });
 }
 
 /**

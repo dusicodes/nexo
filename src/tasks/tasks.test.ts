@@ -156,4 +156,54 @@ describe("Tasks", () => {
       tasks.TaskNotFoundError,
     );
   });
+  it("saves a \"[ ] \" Checklist item as \"[] \" and keeps other lines as typed", async () => {
+    const task = await tasks.add("Write the post", "2026-12-09");
+
+    const updated = await tasks.setDetails(task.id, "[ ] Draft\n- [ ] not a Checklist item\n[x] Outline");
+
+    expect(updated.details).toBe("[] Draft\n- [ ] not a Checklist item\n[x] Outline");
+  });
+
+  it("ticks and unticks a Checklist item, rewriting only that line", async () => {
+    const task = await tasks.add("Write the post", "2026-12-10");
+    await tasks.setDetails(task.id, "https://example.com\n[] Draft\n[] Edit");
+
+    const ticked = await tasks.setChecklistItem(task.id, 2, true);
+    expect(ticked.details).toBe("https://example.com\n[] Draft\n[x] Edit");
+
+    await tasks.setChecklistItem(task.id, 2, false);
+    expect((await tasks.today("2026-12-10"))[0].details).toBe(
+      "https://example.com\n[] Draft\n[] Edit",
+    );
+  });
+
+  it("refuses to tick a line that is not a Checklist item and leaves the Details alone", async () => {
+    const task = await tasks.add("Write the post", "2026-12-11");
+    await tasks.setDetails(task.id, "- outline\n[] Draft");
+
+    await expect(tasks.setChecklistItem(task.id, 0, true)).rejects.toBeInstanceOf(
+      tasks.NotAChecklistItemError,
+    );
+    await expect(tasks.setChecklistItem(task.id, 2, true)).rejects.toBeInstanceOf(
+      tasks.NotAChecklistItemError,
+    );
+
+    expect((await tasks.today("2026-12-11"))[0].details).toBe("- outline\n[] Draft");
+  });
+
+  it("leaves the Task open when its only Checklist item is ticked", async () => {
+    const task = await tasks.add("Write the post", "2026-12-12");
+    await tasks.setDetails(task.id, "[] Draft");
+
+    await tasks.setChecklistItem(task.id, 0, true);
+
+    // The snapshot holds every stored field, including the day it was completed.
+    expect((await tasks.delete(task.id)).completedDay).toBeNull();
+  });
+
+  it("refuses to tick a Checklist item of a Task that does not exist", async () => {
+    await expect(tasks.setChecklistItem("no-such-task", 0, true)).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+  });
 });

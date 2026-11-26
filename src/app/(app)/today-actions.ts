@@ -47,6 +47,18 @@ export async function setTaskDetails(id: string, details: string): Promise<tasks
   return tasks.setDetails(id, details);
 }
 
+export async function setTaskChecklistItem(
+  id: string,
+  lineIndex: number,
+  ticked: boolean,
+): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string" || typeof lineIndex !== "number" || typeof ticked !== "boolean") {
+    throw new Error("A Task id, line number and ticked state are needed.");
+  }
+  return tasks.setChecklistItem(id, lineIndex, ticked);
+}
+
 export async function deleteTask(id: string): Promise<tasks.TaskSnapshot> {
   await requireSession();
   if (typeof id !== "string") {
