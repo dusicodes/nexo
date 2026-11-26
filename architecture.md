@@ -132,7 +132,7 @@ Boundary rules:
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
 | Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
-| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Checklist items live inside the `details` text as `[] `/`[x] ` line markers, read by pure functions in `src/tasks/details.ts` that the page shares (issue #34). A Task is done exactly when `completed_day` is set; Today lists open Tasks, then those completed that day (issue #30). Tested against in-memory PGlite with the real migrations | `implemented` |
+| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Checklist items live inside the `details` text as `[] `/`[x] ` line markers, read by pure functions in `src/tasks/details.ts` that the page shares (issue #34). A Task is done exactly when `completed_day` is set; Today lists the open Tasks and those completed that day in the order they were added, so a done Task keeps its place (issue #30). Tested against in-memory PGlite with the real migrations | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
@@ -483,6 +483,10 @@ link); update section 13 for lasting decisions; write a short ADR in
   Task's title and Details struck through and all its Checklist items ticked, while their
   saved ticks are kept for reopening (`GLOSSARY.md` updated). The page behaviour has no
   automated test; it was checked by hand in a browser. Updates sections 6 and 12.
+- 2026-11-26 - Done Tasks keep their place: by the owner's decision, `today()` no longer
+  lists done Tasks below the open ones; every Task stays in the order it was added, done or
+  not, and a new Task goes at the end. This replaces the open-then-done order from spec
+  #29 and issue #30. Updates section 6.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

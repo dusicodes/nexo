@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
 import { normaliseDetails, tickChecklistItem } from "./details";
@@ -81,9 +81,9 @@ export async function add(title: string, localDate: LocalDate): Promise<TodayTas
 }
 
 /**
- * What Today shows for `localDate`: the open Tasks planned for it, then the
- * Tasks completed on it, each group oldest (first added) first. A done Task
- * leaves Today when the day ends but stays stored.
+ * What Today shows for `localDate`: the open Tasks planned for it and the
+ * Tasks completed on it, oldest (first added) first. A done Task keeps its
+ * place; it leaves Today when the day ends but stays stored.
  */
 export async function today(localDate: LocalDate): Promise<TodayTask[]> {
   assertLocalDate(localDate);
@@ -96,7 +96,7 @@ export async function today(localDate: LocalDate): Promise<TodayTask[]> {
         eq(tasks.completedDay, localDate),
       ),
     )
-    .orderBy(sql`${tasks.completedDay} is not null`, asc(tasks.seq));
+    .orderBy(asc(tasks.seq));
   return rows.map(toTodayTask);
 }
 

@@ -215,20 +215,20 @@ describe("Tasks", () => {
     expect(done.completedDay).toBe("2026-12-13");
     expect((await tasks.today("2026-12-13"))[0].completedDay).toBe("2026-12-13");
   });
-  it("lists open Tasks first and done Tasks below them, each oldest first", async () => {
+  it("keeps done Tasks in their place and adds new Tasks after them", async () => {
     const first = await tasks.add("First", "2026-12-14");
     await tasks.add("Second", "2026-12-14");
     const third = await tasks.add("Third", "2026-12-14");
-    await tasks.add("Fourth", "2026-12-14");
 
     await tasks.complete(third.id, "2026-12-14");
     await tasks.complete(first.id, "2026-12-14");
+    await tasks.add("Fourth", "2026-12-14");
 
     expect((await tasks.today("2026-12-14")).map((shown) => shown.title)).toEqual([
-      "Second",
-      "Fourth",
       "First",
+      "Second",
       "Third",
+      "Fourth",
     ]);
   });
 
@@ -242,7 +242,7 @@ describe("Tasks", () => {
       completedDay: "2026-12-15",
     });
   });
-  it("reopens a done Task back into the open group", async () => {
+  it("reopens a done Task in its place", async () => {
     const first = await tasks.add("First", "2026-12-17");
     await tasks.add("Second", "2026-12-17");
     await tasks.complete(first.id, "2026-12-17");

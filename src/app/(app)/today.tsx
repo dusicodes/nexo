@@ -56,15 +56,6 @@ function formatHeading(localDate: LocalDate): string {
 /** A Task on the page; `saving` until the server has confirmed it. */
 type ShownTask = TodayTask & { saving?: boolean };
 
-/**
- * Today's order: open Tasks first, then done ones, each oldest first. A line
- * still saving has no seq yet, so it sits at the bottom of the open Tasks.
- */
-function inTodayOrder(tasks: ShownTask[]): ShownTask[] {
-  const done = (task: ShownTask) => (task.completedDay === null ? 0 : 1);
-  return tasks.toSorted((a, b) => done(a) - done(b) || a.seq - b.seq);
-}
-
 /** The Tasks on the page and the day they were loaded for. */
 type ShownDay = { day: LocalDate; tasks: ShownTask[] };
 
@@ -332,7 +323,7 @@ export function Today() {
 
       {tasks !== null && (
         <ul className="mt-8 flex flex-col" aria-label="Tasks">
-          {inTodayOrder(tasks).map((task) => (
+          {tasks.map((task) => (
             <TaskLine
               key={task.id}
               task={task}
