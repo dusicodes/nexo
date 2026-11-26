@@ -419,6 +419,54 @@ function useAutosave(commit: (value: string) => void, saved: string) {
 /** An edit in progress: the text from before it, and the text now. */
 type Edit = { original: string; value: string };
 
+/**
+ * Where in the Details text a click on one of its shown lines landed, so the
+ * editor opens with the caret there. A Checklist item's marker is hidden, so
+ * its length is added back. Undefined when the click is not on a line.
+ */
+function caretAtClick(event: React.MouseEvent, details: string): number | undefined {
+  const lineElement = (event.target as HTMLElement).closest<HTMLElement>("[data-line]");
+  if (lineElement === null) {
+    return undefined;
+  }
+  const lineIndex = Number(lineElement.dataset.line);
+  const lines = details.split("\n");
+  const rawLine = lines[lineIndex] ?? "";
+  const shownText = readDetails(rawLine)[0].text;
+  const lineStart = lines.slice(0, lineIndex).reduce((sum, line) => sum + line.length + 1, 0);
+  const textElement = lineElement.querySelector<HTMLElement>("[data-line-text]") ?? lineElement;
+  // Beside the text (past its end, or on the checkbox gap) goes to the line's end.
+  const within = offsetAtPoint(textElement, event.clientX, event.clientY) ?? shownText.length;
+  return lineStart + (rawLine.length - shownText.length) + Math.min(within, shownText.length);
+}
+
+/** How many characters of `element`'s text lie before the point, if the point is in it. */
+function offsetAtPoint(element: HTMLElement, x: number, y: number): number | undefined {
+  let node: Node;
+  let offset: number;
+  if (typeof document.caretPositionFromPoint === "function") {
+    const position = document.caretPositionFromPoint(x, y);
+    if (position === null) {
+      return undefined;
+    }
+    ({ offsetNode: node, offset } = position);
+  } else {
+    // WebKit (Safari, and Tauri on macOS) only has the older caretRangeFromPoint.
+    const range = document.caretRangeFromPoint(x, y);
+    if (range === null) {
+      return undefined;
+    }
+    ({ startContainer: node, startOffset: offset } = range);
+  }
+  if (!element.contains(node)) {
+    return undefined;
+  }
+  const before = document.createRange();
+  before.setStart(element, 0);
+  before.setEnd(node, offset);
+  return before.toString().length;
+}
+
 /** Grows a textarea to fit its text, wrapped lines included. */
 function fitHeight(textarea: HTMLTextAreaElement) {
   textarea.style.height = "auto";
@@ -467,6 +515,7 @@ function TaskLine({
   );
   const titleEditEnded = useRef(false);
   const detailsEditEnded = useRef(false);
+  const detailsCaret = useRef<number | null>(null);
   const titleButton = useRef<HTMLButtonElement>(null);
   const titleSave = useAutosave(onTitleChange, task.title);
   const detailsSave = useAutosave(onDetailsChange, task.details);
@@ -490,10 +539,12 @@ function TaskLine({
     }
   };
 
-  // Opens Details for editing, with the caret on a fresh line below what is
-  // already there when `newLine` is set (Shift+Enter in the title).
-  const startDetailsEditing = ({ newLine }: { newLine: boolean }) => {
+  // Opens Details for editing. The caret goes at `caret` (where a click on the
+  // Details landed), else at the end, on a fresh line below what is already
+  // there when `newLine` is set (Shift+Enter in the title).
+  const startDetailsEditing = ({ newLine, caret }: { newLine: boolean; caret?: number }) => {
     const value = newLine && task.details !== "" ? `${task.details}\n` : task.details;
+    detailsCaret.current = caret ?? null;
     detailsSave.start(task.details);
     detailsEditEnded.current = false;
     setDetailsEdit({ original: task.details, value });
@@ -593,8 +644,9 @@ function TaskLine({
             }}
             className="block w-full resize-none bg-transparent text-sm leading-6 text-muted-foreground outline-none"
             onFocus={(event) => {
-              const end = event.target.value.length;
-              event.target.setSelectionRange(end, end);
+              const caret = detailsCaret.current ?? event.target.value.length;
+              detailsCaret.current = null;
+              event.target.setSelectionRange(caret, caret);
               onDetailsOpened();
             }}
             onChange={(event) => {
@@ -629,14 +681,14 @@ function TaskLine({
               className="cursor-text text-sm leading-6 break-words whitespace-pre-wrap text-muted-foreground"
               onClick={(event) => {
                 if (!task.saving && !(event.target as HTMLElement).closest("a, input")) {
-                  startDetailsEditing({ newLine: false });
+                  startDetailsEditing({ newLine: false, caret: caretAtClick(event, details) });
                 }
               }}
             >
               {readDetails(details).map((line, lineIndex) =>
                 line.kind === "checklist" ? (
                   // Not a <label>: clicking the text edits the Details, only the box ticks.
-                  <div key={lineIndex} className="flex items-start gap-2">
+                  <div key={lineIndex} data-line={lineIndex} className="flex items-start gap-2">
                     <input
                       type="checkbox"
                       checked={line.ticked}
@@ -645,13 +697,16 @@ function TaskLine({
                       className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
                       onChange={(event) => onChecklistItemTick(lineIndex, event.target.checked)}
                     />
-                    <span className={cn("min-w-0", line.ticked && "line-through opacity-70")}>
+                    <span
+                      data-line-text
+                      className={cn("min-w-0", line.ticked && "line-through opacity-70")}
+                    >
                       <DetailsText details={line.text} />
                     </span>
                   </div>
                 ) : (
                   // An empty line keeps its height, as it did in the plain text.
-                  <p key={lineIndex} className="min-h-6">
+                  <p key={lineIndex} data-line={lineIndex} className="min-h-6">
                     <DetailsText details={line.text} />
                   </p>
                 ),
