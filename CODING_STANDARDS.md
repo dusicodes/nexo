@@ -25,8 +25,8 @@ sign-in, a browser) is named as unverified rather than closed.
 
 ## Design language
 
-Every surface of nexo looks the same way, the way Today does (issue #36; mockups
-"A · Ink" and "A · Ink, light theme" on the design canvas linked from that issue).
+Every surface of nexo looks the same way, the way Today does (issue #36). The
+reference mockups are `docs/design/ink-dark.html` and `docs/design/ink-light.html`.
 New UI follows these rules, and review treats a departure from them as a defect.
 
 - **Warm paper, not UI grey. One layout, two palettes.** Dark is Ink (warm near-black
@@ -36,10 +36,9 @@ New UI follows these rules, and review treats a departure from them as a defect.
 - **Colours are theme tokens.** Use the tokens in `src/app/globals.css`
   (`background`, `foreground`, `muted-foreground`, `faint`, `link`, `link-hover`,
   `mark`, `mark-faint`, `checklist`, plus the shadcn set), never a one-off colour. A
-  new colour is a new token with a value in both `:root` and `.dark`. Text tokens
-  stay at 4.5:1 or more on the background in both themes; add any new text token to
-  `src/test/palette-contrast.test.ts`. `mark` and `mark-faint` are for ink marks, never
-  text.
+  new colour is a new token with a value in both `:root` and `.dark`.
+  `src/test/palette-contrast.test.ts` holds every text colour used under `src/` to 4.5:1
+  in both themes; `mark` and `mark-faint` are for ink marks, never text.
 - **Lots of space, almost no chrome.** A single centred column about 640px wide with a
   generous top margin. No cards, borders or boxes around the user's things.
 - **Two voices.** The user's own words (Task titles, Details, Checklist items) are set
