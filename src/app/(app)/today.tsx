@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "cn";
 import { Check, Trash2 } from "lucide-react";
+import { isCarriedOver, isOnToday, plannedDayHint } from "@/tasks/carry-over";
 import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
 import type { ChecklistItemRef, TaskSnapshot, TodayTask } from "@/tasks/tasks";
@@ -296,7 +297,7 @@ export function Today() {
     setUndoable(null);
     snapshot.then(restoreTask).then(
       (task) => {
-        if (shown?.day === task.plannedDay) {
+        if (shown !== null && isOnToday(task, shown.day)) {
           insertInOrder(task);
         }
       },
@@ -332,6 +333,13 @@ export function Today() {
             <TaskLine
               key={task.id}
               task={task}
+              // Worked out from the Task as it stands on the page rather than the
+              // loaded `carriedOver` flag, so ticking it done drops the hint at once.
+              carriedOverHint={
+                shown !== null && isCarriedOver(task, shown.day)
+                  ? plannedDayHint(task.plannedDay, shown.day)
+                  : null
+              }
               openDetails={openDetailsOf === task.id}
               onDetailsOpened={() => setOpenDetailsOf(null)}
               onTitleChange={(title) => saveTitle(task.id, title)}
@@ -520,6 +528,7 @@ function fitHeight(textarea: HTMLTextAreaElement) {
  */
 function TaskLine({
   task,
+  carriedOverHint,
   openDetails,
   onDetailsOpened,
   onTitleChange,
@@ -530,6 +539,8 @@ function TaskLine({
   onEmptied,
 }: {
   task: ShownTask;
+  /** For a Carried-over Task, the hint of its Planned day ("from Tuesday"); else null. */
+  carriedOverHint: string | null;
   /** Opens the Details editor when the line first appears. */
   openDetails: boolean;
   onDetailsOpened: () => void;
@@ -679,6 +690,9 @@ function TaskLine({
             }}
             onBlur={() => endTitleEditing(titleEdit.value, { refocus: false })}
           />
+        )}
+        {carriedOverHint !== null && (
+          <p className="text-xs leading-5 text-muted-foreground/80">{carriedOverHint}</p>
         )}
         {detailsEdit !== null ? (
           <textarea

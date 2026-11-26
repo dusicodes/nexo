@@ -18,7 +18,7 @@ async function requireSession(): Promise<void> {
   }
 }
 
-export async function loadToday(localDate: string): Promise<tasks.TodayTask[]> {
+export async function loadToday(localDate: string): Promise<tasks.TodayListing[]> {
   await requireSession();
   return tasks.today(localDate);
 }

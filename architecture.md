@@ -132,7 +132,7 @@ Boundary rules:
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
 | Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
-| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Checklist items live inside the `details` text as `[] `/`[x] ` line markers, read by pure functions in `src/tasks/details.ts` that the page shares (issue #34). A Task is done exactly when `completed_day` is set; Today lists the open Tasks and those completed that day in the order they were added, so a done Task keeps its place (issue #30). Tested against in-memory PGlite with the real migrations | `implemented` |
+| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Checklist items live inside the `details` text as `[] `/`[x] ` line markers, read by pure functions in `src/tasks/details.ts` that the page shares (issue #34). A Task is done exactly when `completed_day` is set; Today lists the open Tasks planned for that day or earlier and those completed that day in the order they were added, so a done Task keeps its place (issue #30); since a Task is added for the day it is written, Carried-over Tasks come first. Tasks planned for a later day are not listed. The carry-over rules (`isOnToday`, `isCarriedOver`, the "from Tuesday" hint) are pure functions in `src/tasks/carry-over.ts` that the page shares (issue #31); the page's use of them has no automated test. Tested against in-memory PGlite with the real migrations | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
@@ -342,7 +342,7 @@ The first product slice has started: the signed-in home page is Today, where the
 writes Tasks for the day (issue #35, part of spec #29), edits their titles in place and
 deletes them with undo (issue #32), adds plain-text Details under them (issue #33), and
 ticks Checklist items within those Details (issue #34), and completes and reopens Tasks
-(issue #30); carry-over follows in a later ticket.
+(issue #30); open Tasks from earlier days carry over onto Today (issue #31).
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -494,6 +494,14 @@ link); update section 13 for lasting decisions; write a short ADR in
   the portable subset. A Task is completed on the day the page shows, not the clock's day,
   so one ticked just after midnight stays with its day. After a failed save the page
   reloads Today rather than rolling back by guesswork. Updates section 6.
+- 2026-11-26 - Carried-over Tasks (issue #31): `today()` now also returns open Tasks
+  planned for an earlier day, each flagged `carriedOver`, in the order they were added,
+  and never Tasks planned for a later day. The rules sit in `src/tasks/carry-over.ts`,
+  shared with the page, which shows a Carried-over Task's Planned day as "from <weekday>"
+  within the last week, otherwise a short date, and brings back an undone delete of a
+  Carried-over Task. The Tasks tests now clear the table before each test, since open
+  Tasks carry over between test days. The page behaviour has no automated test. Updates
+  sections 6 and 12.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

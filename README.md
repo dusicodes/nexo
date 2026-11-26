@@ -195,7 +195,8 @@ The foundation slice is in place: the runnable app shell, the local data layer,
 the auth configuration, and the AI/MCP seams. The first product screen is in
 progress: after signing in, the home page is **Today**, where you write, edit and
 delete the day's Tasks, add Details under them with Checklist items you can tick, and
-tick Tasks done (see `GLOSSARY.md` for the terms).
+tick Tasks done. Open Tasks from earlier days carry over onto Today (see `GLOSSARY.md`
+for the terms).
 
 ### Requirements
 

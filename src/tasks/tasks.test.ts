@@ -1,5 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { useTestDatabase } from "@/test/test-database";
+import { isOnToday } from "./carry-over";
 
 type Tasks = typeof import("./tasks");
 
@@ -12,8 +13,13 @@ describe("Tasks", () => {
     tasks = await import("./tasks");
   });
 
-  // The database is shared by the whole file, so each test works on its own
-  // day to stay independent of the others.
+  // The database is shared by the whole file. Open Tasks carry over to later
+  // days, so each test starts with no Tasks stored.
+  beforeEach(async () => {
+    const { getDb } = await import("@/db/client");
+    const { tasks: table } = await import("@/db/schema");
+    await getDb().delete(table);
+  });
 
   it("shows a Task added today on Today", async () => {
     await tasks.add("Email the hiring manager", "2026-11-26");
@@ -34,10 +40,10 @@ describe("Tasks", () => {
     expect(today.map((task) => task.title)).toEqual(["First", "Second", "Third"]);
   });
 
-  it("does not show a Task planned for another day", async () => {
+  it("does not show a Task planned for a future day", async () => {
     await tasks.add("Saturday's Task", "2026-11-28");
 
-    expect(await tasks.today("2026-11-29")).toEqual([]);
+    expect(await tasks.today("2026-11-27")).toEqual([]);
   });
 
   it("refuses a blank title and saves nothing", async () => {
@@ -293,5 +299,46 @@ describe("Tasks", () => {
     ).rejects.toBeInstanceOf(tasks.NotAChecklistItemError);
 
     expect((await tasks.today("2026-12-21"))[0].details).toBe("[] Outline first\n[] Draft");
+  });
+
+  it("carries an open Task from yesterday over to Today, flagged with its Planned day", async () => {
+    await tasks.add("Call the bank", "2026-11-25");
+
+    expect(await tasks.today("2026-11-26")).toEqual([
+      expect.objectContaining({
+        title: "Call the bank",
+        plannedDay: "2026-11-25",
+        carriedOver: true,
+      }),
+    ]);
+  });
+
+  it("carries open Tasks over several days, oldest first, above today's", async () => {
+    await tasks.add("From last week", "2026-11-18");
+    const doneEarlier = await tasks.add("Done on Monday", "2026-11-23");
+    await tasks.complete(doneEarlier.id, "2026-11-23");
+    await tasks.add("From Tuesday", "2026-11-24");
+    await tasks.add("Planned today", "2026-11-26");
+
+    const today = await tasks.today("2026-11-26");
+
+    expect(today.map(({ title, carriedOver }) => [title, carriedOver])).toEqual([
+      ["From last week", true],
+      ["From Tuesday", true],
+      ["Planned today", false],
+    ]);
+    // The page decides what Today holds with the same rule.
+    expect(today.every((task) => isOnToday(task, "2026-11-26"))).toBe(true);
+  });
+
+  it("keeps a Carried-over Task completed today on Today, no longer carried over", async () => {
+    const task = await tasks.add("Call the bank", "2026-11-24");
+
+    await tasks.complete(task.id, "2026-11-26");
+
+    expect(await tasks.today("2026-11-26")).toEqual([
+      expect.objectContaining({ title: "Call the bank", carriedOver: false }),
+    ]);
+    expect(await tasks.today("2026-11-27")).toEqual([]);
   });
 });

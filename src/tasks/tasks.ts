@@ -1,6 +1,7 @@
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
+import { isCarriedOver } from "./carry-over";
 import { normaliseDetails, tickChecklistItem, type ChecklistItemRef } from "./details";
 import { isLocalDate, type LocalDate } from "./local-date";
 
@@ -80,24 +81,33 @@ export async function add(title: string, localDate: LocalDate): Promise<TodayTas
   return toTodayTask(created);
 }
 
+/** A Task as `today` lists it, flagged when it is a Carried-over Task. */
+export type TodayListing = TodayTask & { carriedOver: boolean };
+
 /**
- * What Today shows for `localDate`: the open Tasks planned for it and the
- * Tasks completed on it, oldest (first added) first. A done Task keeps its
- * place; it leaves Today when the day ends but stays stored.
+ * What Today shows for `localDate`: the open Tasks planned for it or for an
+ * earlier day (Carried-over Tasks), and the Tasks completed on it, oldest
+ * (first added) first, so old unfinished Tasks rise to the top. A done Task
+ * keeps its place; it leaves Today when the day ends but stays stored. Tasks
+ * planned for a later day are not shown.
  */
-export async function today(localDate: LocalDate): Promise<TodayTask[]> {
+export async function today(localDate: LocalDate): Promise<TodayListing[]> {
   assertLocalDate(localDate);
   const rows = await getDb()
     .select()
     .from(tasks)
     .where(
       or(
-        and(eq(tasks.plannedDay, localDate), isNull(tasks.completedDay)),
+        // LocalDate text sorts as the days do, so "on or before" is lte.
+        and(lte(tasks.plannedDay, localDate), isNull(tasks.completedDay)),
         eq(tasks.completedDay, localDate),
       ),
     )
     .orderBy(asc(tasks.seq));
-  return rows.map(toTodayTask);
+  return rows.map((row) => ({
+    ...toTodayTask(row),
+    carriedOver: isCarriedOver(row, localDate),
+  }));
 }
 
 /** Gives a Task a new title. */
