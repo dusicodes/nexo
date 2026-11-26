@@ -13,7 +13,7 @@ Free text written under a Task's title that adds context to that Task, such as a
 _Avoid_: Notes, description, body
 
 **Checklist item**:
-A checkable line within a Task's Details; ticking it never completes the Task, and completing the Task leaves it untouched.
+A checkable line within a Task's Details; ticking it never completes the Task. While the Task is done, its Checklist items show ticked and struck through with the rest of it, but their own ticks are kept, so reopening the Task shows them as they were.
 _Avoid_: Subtask, step
 
 **Planned day**:

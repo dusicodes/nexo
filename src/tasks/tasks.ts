@@ -1,7 +1,10 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
+import { normaliseDetails, tickChecklistItem, type ChecklistItemRef } from "./details";
 import { isLocalDate, type LocalDate } from "./local-date";
+
+export { NotAChecklistItemError, type ChecklistItemRef } from "./details";
 
 /**
  * The Tasks module: the only code that reads or writes Tasks (GLOSSARY.md).
@@ -20,6 +23,8 @@ export type TodayTask = {
   /** Plain text under the title, exactly as typed; empty when there are none. */
   details: string;
   plannedDay: LocalDate;
+  /** The local day the Task was completed; null while it is open. */
+  completedDay: LocalDate | null;
   /** Where the Task stands: Today lists Tasks by ascending seq. */
   seq: number;
 };
@@ -30,6 +35,7 @@ function toTodayTask(row: TaskSnapshot): TodayTask {
     title: row.title,
     details: row.details,
     plannedDay: row.plannedDay,
+    completedDay: row.completedDay,
     seq: row.seq,
   };
 }
@@ -74,13 +80,22 @@ export async function add(title: string, localDate: LocalDate): Promise<TodayTas
   return toTodayTask(created);
 }
 
-/** What Today shows for `localDate`, oldest (first added) first. */
+/**
+ * What Today shows for `localDate`: the open Tasks planned for it and the
+ * Tasks completed on it, oldest (first added) first. A done Task keeps its
+ * place; it leaves Today when the day ends but stays stored.
+ */
 export async function today(localDate: LocalDate): Promise<TodayTask[]> {
   assertLocalDate(localDate);
   const rows = await getDb()
     .select()
     .from(tasks)
-    .where(eq(tasks.plannedDay, localDate))
+    .where(
+      or(
+        and(eq(tasks.plannedDay, localDate), isNull(tasks.completedDay)),
+        eq(tasks.completedDay, localDate),
+      ),
+    )
     .orderBy(asc(tasks.seq));
   return rows.map(toTodayTask);
 }
@@ -98,17 +113,77 @@ export async function rename(id: string, title: string): Promise<TodayTask> {
   return toTodayTask(renamed);
 }
 
-/** Replaces a Task's Details. They are kept exactly as typed, blank included. */
+/**
+ * Replaces a Task's Details. They are kept exactly as typed, blank included,
+ * except that a line starting with "[ ] " is saved as a "[] " Checklist item.
+ */
 export async function setDetails(id: string, details: string): Promise<TodayTask> {
   const [updated] = await getDb()
     .update(tasks)
-    .set({ details, updatedAt: new Date() })
+    .set({ details: normaliseDetails(details), updatedAt: new Date() })
     .where(eq(tasks.id, id))
     .returning();
   if (updated === undefined) {
     throw new TaskNotFoundError(id);
   }
   return toTodayTask(updated);
+}
+
+/** Marks a Task done on `localDate`. Its Details, Checklist items included, stay as they are. */
+export async function complete(id: string, localDate: LocalDate): Promise<TodayTask> {
+  assertLocalDate(localDate);
+  const [completed] = await getDb()
+    .update(tasks)
+    .set({ completedDay: localDate, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  if (completed === undefined) {
+    throw new TaskNotFoundError(id);
+  }
+  return toTodayTask(completed);
+}
+
+/** Reopens a done Task, putting it back among the open Tasks in its old place. */
+export async function reopen(id: string): Promise<TodayTask> {
+  const [reopened] = await getDb()
+    .update(tasks)
+    .set({ completedDay: null, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  if (reopened === undefined) {
+    throw new TaskNotFoundError(id);
+  }
+  return toTodayTask(reopened);
+}
+
+/**
+ * Ticks or unticks one Checklist item in a Task's Details, named by its line
+ * and its text, rewriting only that line's marker. It refuses a line that is
+ * not that Checklist item (so a page with stale Details never ticks the wrong
+ * one), and never completes or reopens the Task.
+ */
+export async function setChecklistItem(
+  id: string,
+  item: ChecklistItemRef,
+  ticked: boolean,
+): Promise<TodayTask> {
+  // Read, then write only if the Details are still what was read, so a save
+  // landing in between is never overwritten. Plain SQL, no row locks, so it
+  // stays within the portable subset (architecture.md section 6).
+  for (;;) {
+    const [task] = await getDb().select().from(tasks).where(eq(tasks.id, id));
+    if (task === undefined) {
+      throw new TaskNotFoundError(id);
+    }
+    const [updated] = await getDb()
+      .update(tasks)
+      .set({ details: tickChecklistItem(task.details, item, ticked), updatedAt: new Date() })
+      .where(and(eq(tasks.id, id), eq(tasks.details, task.details)))
+      .returning();
+    if (updated !== undefined) {
+      return toTodayTask(updated);
+    }
+  }
 }
 
 /**

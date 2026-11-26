@@ -156,4 +156,142 @@ describe("Tasks", () => {
       tasks.TaskNotFoundError,
     );
   });
+  it("saves a \"[ ] \" Checklist item as \"[] \" and keeps other lines as typed", async () => {
+    const task = await tasks.add("Write the post", "2026-12-09");
+
+    const details = "[ ] Draft\n- [ ] not a Checklist item\n[x] Outline";
+
+    const updated = await tasks.setDetails(task.id, details);
+
+    expect(updated.details).toBe("[] Draft\n- [ ] not a Checklist item\n[x] Outline");
+  });
+
+  it("ticks and unticks a Checklist item, rewriting only that line", async () => {
+    const task = await tasks.add("Write the post", "2026-12-10");
+    await tasks.setDetails(task.id, "https://example.com\n[] Draft\n[] Edit");
+
+    const edit = { lineIndex: 2, text: "Edit" };
+    const ticked = await tasks.setChecklistItem(task.id, edit, true);
+    expect(ticked.details).toBe("https://example.com\n[] Draft\n[x] Edit");
+
+    await tasks.setChecklistItem(task.id, edit, false);
+    expect((await tasks.today("2026-12-10"))[0].details).toBe(
+      "https://example.com\n[] Draft\n[] Edit",
+    );
+  });
+
+  it("refuses to tick a line that is not a Checklist item, leaving the Details", async () => {
+    const task = await tasks.add("Write the post", "2026-12-11");
+    await tasks.setDetails(task.id, "- outline\n[] Draft");
+
+    for (const item of [
+      { lineIndex: 0, text: "- outline" },
+      { lineIndex: 2, text: "Draft" },
+    ]) {
+      await expect(tasks.setChecklistItem(task.id, item, true)).rejects.toBeInstanceOf(
+        tasks.NotAChecklistItemError,
+      );
+    }
+
+    expect((await tasks.today("2026-12-11"))[0].details).toBe("- outline\n[] Draft");
+  });
+
+  it("leaves the Task open when its only Checklist item is ticked", async () => {
+    const task = await tasks.add("Write the post", "2026-12-12");
+    await tasks.setDetails(task.id, "[] Draft");
+
+    await tasks.setChecklistItem(task.id, { lineIndex: 0, text: "Draft" }, true);
+
+    // The snapshot holds every stored field, including the day it was completed.
+    expect((await tasks.delete(task.id)).completedDay).toBeNull();
+  });
+
+  it("refuses to tick a Checklist item of a Task that does not exist", async () => {
+    const draft = { lineIndex: 0, text: "Draft" };
+
+    await expect(tasks.setChecklistItem("no-such-task", draft, true)).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+  });
+  it("marks a Task done on the day it is completed", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-13");
+    expect(task.completedDay).toBeNull();
+
+    const done = await tasks.complete(task.id, "2026-12-13");
+
+    expect(done.completedDay).toBe("2026-12-13");
+    expect((await tasks.today("2026-12-13"))[0].completedDay).toBe("2026-12-13");
+  });
+  it("keeps done Tasks in their place and adds new Tasks after them", async () => {
+    const first = await tasks.add("First", "2026-12-14");
+    await tasks.add("Second", "2026-12-14");
+    const third = await tasks.add("Third", "2026-12-14");
+
+    await tasks.complete(third.id, "2026-12-14");
+    await tasks.complete(first.id, "2026-12-14");
+    await tasks.add("Fourth", "2026-12-14");
+
+    expect((await tasks.today("2026-12-14")).map((shown) => shown.title)).toEqual([
+      "First",
+      "Second",
+      "Third",
+      "Fourth",
+    ]);
+  });
+
+  it("drops a done Task from the next day's Today but keeps it stored", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-15");
+    await tasks.complete(task.id, "2026-12-15");
+
+    expect(await tasks.today("2026-12-16")).toEqual([]);
+    expect(await tasks.delete(task.id)).toMatchObject({
+      title: "Pay rent",
+      completedDay: "2026-12-15",
+    });
+  });
+  it("reopens a done Task in its place", async () => {
+    const first = await tasks.add("First", "2026-12-17");
+    await tasks.add("Second", "2026-12-17");
+    await tasks.complete(first.id, "2026-12-17");
+
+    const reopened = await tasks.reopen(first.id);
+
+    expect(reopened.completedDay).toBeNull();
+    expect((await tasks.today("2026-12-17")).map((shown) => shown.title)).toEqual([
+      "First",
+      "Second",
+    ]);
+  });
+
+  it("leaves a Task's Checklist items as they are when it is completed and reopened", async () => {
+    const task = await tasks.add("Write the post", "2026-12-18");
+    await tasks.setDetails(task.id, "[x] Draft\n[] Edit");
+
+    expect((await tasks.complete(task.id, "2026-12-18")).details).toBe("[x] Draft\n[] Edit");
+    expect((await tasks.reopen(task.id)).details).toBe("[x] Draft\n[] Edit");
+  });
+
+  it("refuses to complete or reopen a Task that does not exist", async () => {
+    await expect(tasks.complete("no-such-task", "2026-12-19")).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+    await expect(tasks.reopen("no-such-task")).rejects.toBeInstanceOf(tasks.TaskNotFoundError);
+  });
+
+  it("refuses to complete a Task on a day that is not a local date", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-20");
+
+    await expect(tasks.complete(task.id, "20/12/2026")).rejects.toThrow("Not a local date");
+  });
+  it("refuses to tick a line that no longer holds the Checklist item asked for", async () => {
+    const task = await tasks.add("Write the post", "2026-12-21");
+    await tasks.setDetails(task.id, "[] Outline first\n[] Draft");
+
+    // The page still showed "Draft" on line 0, before the line above was saved.
+    await expect(
+      tasks.setChecklistItem(task.id, { lineIndex: 0, text: "Draft" }, true),
+    ).rejects.toBeInstanceOf(tasks.NotAChecklistItemError);
+
+    expect((await tasks.today("2026-12-21"))[0].details).toBe("[] Outline first\n[] Draft");
+  });
 });

@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "cn";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
+import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
-import type { TaskSnapshot, TodayTask } from "@/tasks/tasks";
+import type { ChecklistItemRef, TaskSnapshot, TodayTask } from "@/tasks/tasks";
 import { DetailsText } from "./details-text";
 import {
   addTask,
+  completeTask,
   deleteTask,
   loadToday,
   renameTask,
+  reopenTask,
   restoreTask,
+  setTaskChecklistItem,
   setTaskDetails,
 } from "./today-actions";
 
@@ -136,6 +140,7 @@ export function Today() {
         title: title.trim(),
         details: "",
         plannedDay: day,
+        completedDay: null,
         seq: Infinity,
         saving: true,
       },
@@ -201,9 +206,55 @@ export function Today() {
   const saveDetails = (id: string, details: string) => {
     setError(null);
     updateTasks((tasks) => tasks.map((task) => (task.id === id ? { ...task, details } : task)));
-    enqueue(id, () => setTaskDetails(id, details)).catch(() =>
-      setError("Couldn't save those Details. Try again."),
+    enqueue(id, () => setTaskDetails(id, details)).catch(() => {
+      setError("Couldn't save those Details. Try again.");
+      reloadAfterFailure();
+    });
+  };
+
+  // After a failed save the page may no longer match what is stored, and
+  // later clicks may have changed it again, so it reloads from the server
+  // rather than guessing what to put back.
+  const reloadAfterFailure = () => setReloads((count) => count + 1);
+
+  // Ticks a Task done (or unticks it to reopen it) on the page at once, then
+  // on the server. It is done on the day the page shows, which the Task
+  // belongs to, even if the clock has just passed midnight.
+  const setDone = (task: ShownTask, done: boolean) => {
+    const completedDay = done ? (shown?.day ?? currentLocalDate()) : null;
+    const mark = (to: LocalDate | null) =>
+      updateTasks((tasks) =>
+        tasks.map((shownTask) =>
+          shownTask.id === task.id ? { ...shownTask, completedDay: to } : shownTask,
+        ),
+      );
+    setError(null);
+    mark(completedDay);
+    enqueue(task.id, () =>
+      completedDay === null ? reopenTask(task.id) : completeTask(task.id, completedDay),
+    ).catch(() => {
+      setError(`Couldn't ${done ? "complete" : "reopen"} that Task. Try again.`);
+      reloadAfterFailure();
+    });
+  };
+
+  // Ticks or unticks a Checklist item on the page at once, then on the server.
+  const tickItem = (id: string, item: ChecklistItemRef, ticked: boolean) => {
+    setError(null);
+    updateTasks((tasks) =>
+      tasks.map((task) => {
+        // The line was a Checklist item when clicked; if the Details changed
+        // since, the page leaves them and the server decides.
+        if (task.id !== id || readDetails(task.details)[item.lineIndex]?.text !== item.text) {
+          return task;
+        }
+        return { ...task, details: tickChecklistItem(task.details, item, ticked) };
+      }),
     );
+    enqueue(id, () => setTaskChecklistItem(id, item, ticked)).catch(() => {
+      setError("Couldn't save that Checklist item. Try again.");
+      reloadAfterFailure();
+    });
   };
 
   // Takes the Task off the page at once and deletes it on the server.
@@ -285,6 +336,8 @@ export function Today() {
               onDetailsOpened={() => setOpenDetailsOf(null)}
               onTitleChange={(title) => saveTitle(task.id, title)}
               onDetailsChange={(details) => saveDetails(task.id, details)}
+              onChecklistItemTick={(item, ticked) => tickItem(task.id, item, ticked)}
+              onDoneChange={(done) => setDone(task, done)}
               onDelete={() => deleteWithUndo(task)}
               onEmptied={() => {
                 deleteEmptied(task);
@@ -395,6 +448,54 @@ function useAutosave(commit: (value: string) => void, saved: string) {
 /** An edit in progress: the text from before it, and the text now. */
 type Edit = { original: string; value: string };
 
+/**
+ * Where in the Details text a click on one of its shown lines landed, so the
+ * editor opens with the caret there. A Checklist item's marker is hidden, so
+ * its length is added back. Undefined when the click is not on a line.
+ */
+function caretAtClick(event: React.MouseEvent, details: string): number | undefined {
+  const lineElement = (event.target as HTMLElement).closest<HTMLElement>("[data-line]");
+  if (lineElement === null) {
+    return undefined;
+  }
+  const lineIndex = Number(lineElement.dataset.line);
+  const lines = details.split("\n");
+  const rawLine = lines[lineIndex] ?? "";
+  const shownText = readDetails(rawLine)[0].text;
+  const lineStart = lines.slice(0, lineIndex).reduce((sum, line) => sum + line.length + 1, 0);
+  const textElement = lineElement.querySelector<HTMLElement>("[data-line-text]") ?? lineElement;
+  // Beside the text (past its end, or on the checkbox gap) goes to the line's end.
+  const within = offsetAtPoint(textElement, event.clientX, event.clientY) ?? shownText.length;
+  return lineStart + (rawLine.length - shownText.length) + Math.min(within, shownText.length);
+}
+
+/** How many characters of `element`'s text lie before the point, if the point is in it. */
+function offsetAtPoint(element: HTMLElement, x: number, y: number): number | undefined {
+  let node: Node;
+  let offset: number;
+  if (typeof document.caretPositionFromPoint === "function") {
+    const position = document.caretPositionFromPoint(x, y);
+    if (position === null) {
+      return undefined;
+    }
+    ({ offsetNode: node, offset } = position);
+  } else {
+    // WebKit (Safari, and Tauri on macOS) only has the older caretRangeFromPoint.
+    const range = document.caretRangeFromPoint(x, y);
+    if (range === null) {
+      return undefined;
+    }
+    ({ startContainer: node, startOffset: offset } = range);
+  }
+  if (!element.contains(node)) {
+    return undefined;
+  }
+  const before = document.createRange();
+  before.setStart(element, 0);
+  before.setEnd(node, offset);
+  return before.toString().length;
+}
+
 /** Grows a textarea to fit its text, wrapped lines included. */
 function fitHeight(textarea: HTMLTextAreaElement) {
   textarea.style.height = "auto";
@@ -412,6 +513,10 @@ function fitHeight(textarea: HTMLTextAreaElement) {
  * Shift+Enter in them starts another line, Enter or Esc ends the edit (Esc
  * putting back the Details from before it), and Backspace in empty Details
  * returns to the title.
+ *
+ * A Details line starting with "[] " (or "[ ] ") shows as a Checklist item
+ * with its own checkbox once the edit ends; "[x] " is a ticked one. Ticking
+ * one only rewrites that line; the Task itself stays open.
  */
 function TaskLine({
   task,
@@ -419,6 +524,8 @@ function TaskLine({
   onDetailsOpened,
   onTitleChange,
   onDetailsChange,
+  onChecklistItemTick,
+  onDoneChange,
   onDelete,
   onEmptied,
 }: {
@@ -428,6 +535,8 @@ function TaskLine({
   onDetailsOpened: () => void;
   onTitleChange: (title: string) => void;
   onDetailsChange: (details: string) => void;
+  onChecklistItemTick: (item: ChecklistItemRef, ticked: boolean) => void;
+  onDoneChange: (done: boolean) => void;
   onDelete: () => void;
   onEmptied: () => void;
 }) {
@@ -437,6 +546,7 @@ function TaskLine({
   );
   const titleEditEnded = useRef(false);
   const detailsEditEnded = useRef(false);
+  const detailsCaret = useRef<number | null>(null);
   const titleButton = useRef<HTMLButtonElement>(null);
   const titleSave = useAutosave(onTitleChange, task.title);
   const detailsSave = useAutosave(onDetailsChange, task.details);
@@ -460,23 +570,26 @@ function TaskLine({
     }
   };
 
-  // Opens Details for editing, with the caret on a fresh line below what is
-  // already there when `newLine` is set (Shift+Enter in the title).
-  const startDetailsEditing = ({ newLine }: { newLine: boolean }) => {
+  // Opens Details for editing. The caret goes at `caret` (where a click on the
+  // Details landed), else at the end, on a fresh line below what is already
+  // there when `newLine` is set (Shift+Enter in the title).
+  const startDetailsEditing = ({ newLine, caret }: { newLine: boolean; caret?: number }) => {
     const value = newLine && task.details !== "" ? `${task.details}\n` : task.details;
+    detailsCaret.current = caret ?? null;
     detailsSave.start(task.details);
     detailsEditEnded.current = false;
     setDetailsEdit({ original: task.details, value });
   };
 
   // Ends the Details edit once. Empty lines left at the end (from Shift+Enter
-  // with nothing typed after it) are dropped; everything else stays as typed.
+  // with nothing typed after it) are dropped, and "[ ] " becomes "[] " as the
+  // Tasks module saves it; everything else stays as typed.
   const endDetailsEditing = (value: string, { refocus }: { refocus: boolean }) => {
     if (detailsEdit === null || detailsEditEnded.current) {
       return;
     }
     detailsEditEnded.current = true;
-    detailsSave.saveNow(value.replace(/\n+$/, ""));
+    detailsSave.saveNow(normaliseDetails(value.replace(/\n+$/, "")));
     setDetailsEdit(null);
     if (refocus) {
       requestAnimationFrame(() => titleButton.current?.focus());
@@ -485,6 +598,7 @@ function TaskLine({
 
   // The Details as the page shows them: what is being typed, else what is saved.
   const details = detailsEdit?.value ?? task.details;
+  const done = task.completedDay !== null;
 
   return (
     <li
@@ -493,8 +607,25 @@ function TaskLine({
         task.saving && "opacity-60",
       )}
     >
-      <TaskBox />
-      <div className="min-w-0 flex-1">
+      <span className="relative mt-1.5 flex size-4 shrink-0">
+        <input
+          type="checkbox"
+          checked={done}
+          disabled={task.saving}
+          aria-label={`${done ? "Reopen" : "Complete"} Task: ${task.title}`}
+          className="peer size-4 cursor-pointer appearance-none rounded-[5px] border border-muted-foreground/50 checked:border-foreground checked:bg-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default"
+          onChange={(event) => onDoneChange(event.target.checked)}
+        />
+        <Check
+          aria-hidden="true"
+          strokeWidth={3}
+          className="pointer-events-none absolute inset-0 m-auto hidden size-3 text-background peer-checked:block"
+        />
+      </span>
+      {/* While the Task is done, everything under it reads as done: its title and
+          Details are struck through and its Checklist items show ticked. Their
+          saved ticks are kept, so reopening it shows them as they were. */}
+      <div className={cn("min-w-0 flex-1", done && "text-muted-foreground line-through")}>
         {titleEdit === null ? (
           <button
             ref={titleButton}
@@ -562,8 +693,9 @@ function TaskLine({
             }}
             className="block w-full resize-none bg-transparent text-sm leading-6 text-muted-foreground outline-none"
             onFocus={(event) => {
-              const end = event.target.value.length;
-              event.target.setSelectionRange(end, end);
+              const caret = detailsCaret.current ?? event.target.value.length;
+              detailsCaret.current = null;
+              event.target.setSelectionRange(caret, caret);
               onDetailsOpened();
             }}
             onChange={(event) => {
@@ -593,17 +725,44 @@ function TaskLine({
           />
         ) : (
           details !== "" && (
-            <p
+            <div
               data-details
               className="cursor-text text-sm leading-6 break-words whitespace-pre-wrap text-muted-foreground"
               onClick={(event) => {
-                if (!task.saving && !(event.target as HTMLElement).closest("a")) {
-                  startDetailsEditing({ newLine: false });
+                if (!task.saving && !(event.target as HTMLElement).closest("a, input")) {
+                  startDetailsEditing({ newLine: false, caret: caretAtClick(event, details) });
                 }
               }}
             >
-              <DetailsText details={details} />
-            </p>
+              {readDetails(details).map((line, lineIndex) =>
+                line.kind === "checklist" ? (
+                  // Not a <label>: clicking the text edits the Details, only the box ticks.
+                  <div key={lineIndex} data-line={lineIndex} className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={done || line.ticked}
+                      disabled={task.saving || done}
+                      aria-label={`Checklist item: ${line.text}`}
+                      className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
+                      onChange={(event) =>
+                        onChecklistItemTick({ lineIndex, text: line.text }, event.target.checked)
+                      }
+                    />
+                    <span
+                      data-line-text
+                      className={cn("min-w-0", line.ticked && "line-through opacity-70")}
+                    >
+                      <DetailsText details={line.text} />
+                    </span>
+                  </div>
+                ) : (
+                  // An empty line keeps its height, as it did in the plain text.
+                  <p key={lineIndex} data-line={lineIndex} className="min-h-6">
+                    <DetailsText details={line.text} />
+                  </p>
+                ),
+              )}
+            </div>
           )
         )}
       </div>
@@ -621,7 +780,7 @@ function TaskLine({
   );
 }
 
-/** The checkbox square in front of each line; it becomes interactive with completing Tasks. */
+/** The checkbox square in front of the new line, before it is a Task. */
 function TaskBox({ faint = false }: { faint?: boolean }) {
   return (
     <span

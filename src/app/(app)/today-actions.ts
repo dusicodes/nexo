@@ -47,6 +47,41 @@ export async function setTaskDetails(id: string, details: string): Promise<tasks
   return tasks.setDetails(id, details);
 }
 
+export async function completeTask(id: string, localDate: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string") {
+    throw new Error("A Task id must be text.");
+  }
+  return tasks.complete(id, localDate);
+}
+
+export async function reopenTask(id: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string") {
+    throw new Error("A Task id must be text.");
+  }
+  return tasks.reopen(id);
+}
+
+export async function setTaskChecklistItem(
+  id: string,
+  item: tasks.ChecklistItemRef,
+  ticked: boolean,
+): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (
+    typeof id !== "string" ||
+    typeof item !== "object" ||
+    item === null ||
+    typeof item.lineIndex !== "number" ||
+    typeof item.text !== "string" ||
+    typeof ticked !== "boolean"
+  ) {
+    throw new Error("A Task id, a Checklist item and its ticked state are needed.");
+  }
+  return tasks.setChecklistItem(id, { lineIndex: item.lineIndex, text: item.text }, ticked);
+}
+
 export async function deleteTask(id: string): Promise<tasks.TaskSnapshot> {
   await requireSession();
   if (typeof id !== "string") {
