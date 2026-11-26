@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "cn";
-import { Check, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { isCarriedOver, isOnToday, plannedDayHint } from "@/tasks/carry-over";
 import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
@@ -46,12 +46,8 @@ function useLocalDate(): LocalDate | null {
   return useSyncExternalStore(subscribeToClock, currentLocalDate, () => null);
 }
 
-function formatHeading(localDate: LocalDate): string {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(startOfLocalDate(localDate));
+function formatDay(localDate: LocalDate, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat(undefined, options).format(startOfLocalDate(localDate));
 }
 
 /** A Task on the page; `saving` until the server has confirmed it. */
@@ -311,7 +307,7 @@ export function Today() {
 
   return (
     <main
-      className="mx-auto flex w-full max-w-2xl flex-1 cursor-text flex-col px-6 pt-10 pb-24 sm:pt-16"
+      className="mx-auto flex w-full max-w-[calc(640px+3rem)] flex-1 cursor-text flex-col px-6 pt-8 pb-8 sm:pt-[72px]"
       aria-busy={shown?.day !== localDate}
       onClick={(event) => {
         // Clicking anywhere on the page that is not a control writes on the
@@ -322,13 +318,17 @@ export function Today() {
         }
       }}
     >
-      <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-        Today
+      {/* nexo's own words (the weekday, hints, placeholder) are italic serif;
+          the user's own words are sans. CODING_STANDARDS.md, "Design language". */}
+      <p className="font-serif text-xl text-muted-foreground italic">
+        {formatDay(localDate, { weekday: "long" })}
       </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">{formatHeading(localDate)}</h1>
+      <h1 className="mt-1 text-[2.75rem] leading-[1.05] font-medium tracking-[-0.035em] sm:text-[56px]">
+        {formatDay(localDate, { day: "numeric", month: "long" })}
+      </h1>
 
       {tasks !== null && (
-        <ul className="mt-8 flex flex-col" aria-label="Tasks">
+        <ul className="mt-11 flex flex-col gap-2.5" aria-label="Tasks">
           {tasks.map((task) => (
             <TaskLine
               key={task.id}
@@ -353,15 +353,15 @@ export function Today() {
               }}
             />
           ))}
-          <li className="flex items-start gap-3 py-1">
+          <li className="flex items-start gap-3.5 py-1">
             <TaskBox faint />
             <input
               ref={newLine}
               value={draft}
               aria-label="New Task"
-              placeholder={tasks.length === 0 ? "Write a Task…" : "New Task"}
+              placeholder="Write a Task…"
               autoFocus={tasks.length === 0}
-              className="min-w-0 flex-1 bg-transparent text-base leading-7 outline-none placeholder:text-muted-foreground/60"
+              className="min-w-0 flex-1 bg-transparent text-lg leading-[1.45] outline-none placeholder:font-serif placeholder:text-faint placeholder:italic sm:text-[19px]"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.nativeEvent.isComposing) {
@@ -379,10 +379,17 @@ export function Today() {
       )}
 
       {error !== null && (
-        <p role="status" className="mt-4 text-sm text-muted-foreground">
+        <p role="status" className="mt-4 font-serif text-base text-muted-foreground italic">
           {error}
         </p>
       )}
+
+      {/* Only keys for features that exist; add one when its feature ships. */}
+      <footer className="mt-auto flex flex-wrap justify-center gap-x-[22px] gap-y-1 pt-16 text-xs text-faint">
+        <span>Enter: new Task</span>
+        <span>Shift+Enter: Details</span>
+        <span>[] : Checklist item</span>
+      </footer>
 
       <div
         role="status"
@@ -614,46 +621,48 @@ function TaskLine({
   return (
     <li
       className={cn(
-        "group flex items-start gap-3 py-1 transition-opacity",
+        "group flex items-start gap-3.5 py-1 transition-opacity",
         task.saving && "opacity-60",
       )}
     >
-      <span className="relative mt-1.5 flex size-4 shrink-0">
+      {/* An ink mark, not a stock widget: a ring, filled in once the Task is done. */}
+      <span className="mt-[7px] flex size-[15px] shrink-0 sm:mt-2">
         <input
           type="checkbox"
           checked={done}
           disabled={task.saving}
           aria-label={`${done ? "Reopen" : "Complete"} Task: ${task.title}`}
-          className="peer size-4 cursor-pointer appearance-none rounded-[5px] border border-muted-foreground/50 checked:border-foreground checked:bg-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default"
+          className="size-[15px] cursor-pointer appearance-none rounded-full border-[1.5px] border-mark checked:border-foreground checked:bg-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:cursor-default"
           onChange={(event) => onDoneChange(event.target.checked)}
         />
-        <Check
-          aria-hidden="true"
-          strokeWidth={3}
-          className="pointer-events-none absolute inset-0 m-auto hidden size-3 text-background peer-checked:block"
-        />
       </span>
-      {/* While the Task is done, everything under it reads as done: its title and
-          Details are struck through and its Checklist items show ticked. Their
-          saved ticks are kept, so reopening it shows them as they were. */}
-      <div className={cn("min-w-0 flex-1", done && "text-muted-foreground line-through")}>
+      {/* While the Task is done, everything under it reads as done: its text dims,
+          its title and Details carry the ink strikethrough, and its Checklist items
+          show ticked. Their saved ticks are kept, so reopening it shows them as
+          they were. */}
+      <div className={cn("min-w-0 flex-1", done && "text-faint")}>
         {titleEdit === null ? (
           <button
             ref={titleButton}
             type="button"
             disabled={task.saving}
             aria-label={`Edit Task: ${task.title}`}
-            className="block w-full cursor-text text-left text-base leading-7 break-words outline-none"
+            className="block w-full cursor-text text-left text-lg leading-[1.45] break-words outline-none sm:text-[19px]"
             onClick={startTitleEditing}
           >
-            {task.title}
+            <span className={cn(done && "ink-strike")}>{task.title}</span>
+            {carriedOverHint !== null && (
+              <span className="ml-3 font-serif text-[15px] whitespace-nowrap text-muted-foreground italic">
+                {carriedOverHint}
+              </span>
+            )}
           </button>
         ) : (
           <input
             value={titleEdit.value}
             aria-label="Task title"
             autoFocus
-            className="block w-full bg-transparent text-base leading-7 outline-none"
+            className="block w-full bg-transparent text-lg leading-[1.45] outline-none sm:text-[19px]"
             onFocus={(event) => {
               const end = event.target.value.length;
               event.target.setSelectionRange(end, end);
@@ -691,9 +700,6 @@ function TaskLine({
             onBlur={() => endTitleEditing(titleEdit.value, { refocus: false })}
           />
         )}
-        {carriedOverHint !== null && (
-          <p className="text-xs leading-5 text-muted-foreground/80">{carriedOverHint}</p>
-        )}
         {detailsEdit !== null ? (
           <textarea
             value={detailsEdit.value}
@@ -705,7 +711,7 @@ function TaskLine({
                 fitHeight(textarea);
               }
             }}
-            className="block w-full resize-none bg-transparent text-sm leading-6 text-muted-foreground outline-none"
+            className="mt-1 block w-full resize-none bg-transparent text-[15px] leading-[1.55] text-muted-foreground outline-none"
             onFocus={(event) => {
               const caret = detailsCaret.current ?? event.target.value.length;
               detailsCaret.current = null;
@@ -741,7 +747,10 @@ function TaskLine({
           details !== "" && (
             <div
               data-details
-              className="cursor-text text-sm leading-6 break-words whitespace-pre-wrap text-muted-foreground"
+              className={cn(
+                "mt-1 cursor-text text-[15px] leading-[1.55] break-words whitespace-pre-wrap",
+                done ? "text-faint" : "text-muted-foreground",
+              )}
               onClick={(event) => {
                 if (!task.saving && !(event.target as HTMLElement).closest("a, input")) {
                   startDetailsEditing({ newLine: false, caret: caretAtClick(event, details) });
@@ -751,20 +760,30 @@ function TaskLine({
               {readDetails(details).map((line, lineIndex) =>
                 line.kind === "checklist" ? (
                   // Not a <label>: clicking the text edits the Details, only the box ticks.
-                  <div key={lineIndex} data-line={lineIndex} className="flex items-start gap-2">
+                  <div
+                    key={lineIndex}
+                    data-line={lineIndex}
+                    className={cn("flex items-start gap-2.5", !done && "text-checklist")}
+                  >
                     <input
                       type="checkbox"
                       checked={done || line.ticked}
                       disabled={task.saving || done}
                       aria-label={`Checklist item: ${line.text}`}
-                      className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
+                      className="mt-[7px] size-[11px] shrink-0 cursor-pointer appearance-none rounded-[3px] border-[1.2px] border-mark checked:border-checklist checked:bg-checklist focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default"
                       onChange={(event) =>
                         onChecklistItemTick({ lineIndex, text: line.text }, event.target.checked)
                       }
                     />
                     <span
                       data-line-text
-                      className={cn("min-w-0", line.ticked && "line-through opacity-70")}
+                      className={cn(
+                        "min-w-0",
+                        done
+                          ? "ink-strike"
+                          : line.ticked &&
+                              "text-muted-foreground line-through decoration-mark",
+                      )}
                     >
                       <DetailsText details={line.text} />
                     </span>
@@ -772,7 +791,9 @@ function TaskLine({
                 ) : (
                   // An empty line keeps its height, as it did in the plain text.
                   <p key={lineIndex} data-line={lineIndex} className="min-h-6">
-                    <DetailsText details={line.text} />
+                    <span className={cn(done && line.text !== "" && "ink-strike")}>
+                      <DetailsText details={line.text} />
+                    </span>
                   </p>
                 ),
               )}
@@ -800,8 +821,8 @@ function TaskBox({ faint = false }: { faint?: boolean }) {
     <span
       aria-hidden="true"
       className={cn(
-        "mt-1.5 size-4 shrink-0 rounded-[5px] border border-muted-foreground/50",
-        faint && "border-dashed border-muted-foreground/30",
+        "mt-[7px] size-[15px] shrink-0 rounded-full border-[1.5px] border-mark sm:mt-2",
+        faint && "border-dashed border-mark-faint",
       )}
     />
   );

@@ -12,6 +12,7 @@ export function SignOutButton() {
       type="button"
       variant="ghost"
       size="sm"
+      className="text-[13px] font-normal text-muted-foreground"
       onClick={async () => {
         await authClient.signOut();
         router.replace("/login");

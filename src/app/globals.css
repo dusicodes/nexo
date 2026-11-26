@@ -7,9 +7,17 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-lilex);
+  /* Two voices: the user's own words in sans, nexo's own words in italic serif. */
+  --font-sans: var(--font-inter-tight);
+  --font-serif: var(--font-newsreader);
   --font-mono: var(--font-lilex);
-  --font-heading: var(--font-lilex);
+  --font-heading: var(--font-inter-tight);
+  --color-faint: var(--faint);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-mark: var(--mark);
+  --color-mark-faint: var(--mark-faint);
+  --color-checklist: var(--checklist);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,73 +56,97 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The nexo palette (CODING_STANDARDS.md, "Design language"): warm paper, one
+ * layout, two palettes. :root is Daybook paper (light), .dark is Ink, the
+ * default. Themes change colours only, never layout. Text tokens (foreground,
+ * muted-foreground, faint, link) stay at 4.5:1 or more on the background;
+ * src/test/palette-contrast.test.ts checks it. mark and mark-faint are for
+ * ink marks (checkbox rings), never text. ink-stroke draws the .ink-strike
+ * line in the foreground colour; a data URI cannot read a variable, so its
+ * stroke colour repeats --foreground and must change with it.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --background: #f4f0e8;
+  --foreground: #24211c;
+  --muted-foreground: #6b655a;
+  --faint: #6b655a;
+  --link: #7a4b1e;
+  --link-hover: #4f2f10;
+  --mark: #8b8477;
+  --mark-faint: #b3ab9c;
+  --checklist: #3f3a32;
+  --card: #f4f0e8;
+  --card-foreground: #24211c;
+  --popover: #faf7f1;
+  --popover-foreground: #24211c;
+  --primary: #24211c;
+  --primary-foreground: #f4f0e8;
+  --secondary: #e9e3d8;
+  --secondary-foreground: #24211c;
+  --muted: #e9e3d8;
+  --accent: #e9e3d8;
+  --accent-foreground: #24211c;
+  --destructive: #a3341f;
+  --border: #ddd6c9;
+  --input: #d3cbbd;
+  --ring: #8b8477;
+  --chart-1: #d3cbbd;
+  --chart-2: #8b8477;
+  --chart-3: #6b655a;
+  --chart-4: #3f3a32;
+  --chart-5: #24211c;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #efeae0;
+  --sidebar-foreground: #24211c;
+  --sidebar-primary: #24211c;
+  --sidebar-primary-foreground: #f4f0e8;
+  --sidebar-accent: #e9e3d8;
+  --sidebar-accent-foreground: #24211c;
+  --sidebar-border: #ddd6c9;
+  --sidebar-ring: #8b8477;
+  --ink-stroke: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M1 6 C 20 3, 35 7, 55 5 S 85 3, 99 5' fill='none' stroke='%2324211c' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #1b1a18;
+  --foreground: #ebe7df;
+  --muted-foreground: #a39d91;
+  --faint: #8a8478;
+  --link: #d9c9a8;
+  --link-hover: #f1e6cf;
+  --mark: #8a8478;
+  --mark-faint: #5f5a51;
+  --checklist: #c9c3b7;
+  --card: #22211e;
+  --card-foreground: #ebe7df;
+  --popover: #22211e;
+  --popover-foreground: #ebe7df;
+  --primary: #ebe7df;
+  --primary-foreground: #1b1a18;
+  --secondary: #2a2825;
+  --secondary-foreground: #ebe7df;
+  --muted: #2a2825;
+  --accent: #2a2825;
+  --accent-foreground: #ebe7df;
+  --destructive: #e0826b;
+  --border: #33312d;
+  --input: #3a3833;
+  --ring: #8a8478;
+  --chart-1: #c9c3b7;
+  --chart-2: #a39d91;
+  --chart-3: #8a8478;
+  --chart-4: #5f5a51;
+  --chart-5: #33312d;
+  --sidebar: #22211e;
+  --sidebar-foreground: #ebe7df;
+  --sidebar-primary: #ebe7df;
+  --sidebar-primary-foreground: #1b1a18;
+  --sidebar-accent: #2a2825;
+  --sidebar-accent-foreground: #ebe7df;
+  --sidebar-border: #33312d;
+  --sidebar-ring: #8a8478;
+  --ink-stroke: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M1 6 C 20 3, 35 7, 55 5 S 85 3, 99 5' fill='none' stroke='%23ebe7df' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
 }
 
 @layer base {
@@ -162,4 +194,20 @@ html[data-welcome-seen] .welcome-overlay {
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+/*
+ * The ink strikethrough of a done Task: a slightly irregular hand-drawn stroke
+ * instead of a straight line-through. A background, so it follows the text
+ * onto every wrapped line.
+ */
+.ink-strike {
+  background-image: var(--ink-stroke);
+  background-repeat: no-repeat;
+  background-position: 0 55%;
+  background-size: 100% 0.6em;
+  padding-inline: 0.2em;
+  margin-inline: -0.2em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }

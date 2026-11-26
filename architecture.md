@@ -342,7 +342,12 @@ The first product slice has started: the signed-in home page is Today, where the
 writes Tasks for the day (issue #35, part of spec #29), edits their titles in place and
 deletes them with undo (issue #32), adds plain-text Details under them (issue #33), and
 ticks Checklist items within those Details (issue #34), and completes and reopens Tasks
-(issue #30); open Tasks from earlier days carry over onto Today (issue #31).
+(issue #30); open Tasks from earlier days carry over onto Today (issue #31). Today is
+styled in the nexo design language (warm paper, Ink dark and Daybook light palettes as
+theme tokens in `src/app/globals.css`, Inter Tight for the user's words and italic
+Newsreader for nexo's own, ink marks), which every later surface follows; the rules are
+in `CODING_STANDARDS.md`, "Design language" (issue #36). Text contrast is tested; the
+look itself was checked by hand in a browser.
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -494,6 +499,14 @@ link); update section 13 for lasting decisions; write a short ADR in
   the portable subset. A Task is completed on the day the page shows, not the clock's day,
   so one ticked just after midnight stays with its day. After a failed save the page
   reloads Today rather than rolling back by guesswork. Updates section 6.
+- 2026-11-26 - The nexo design language (issue #36): Today restyled in the Ink direction,
+  which becomes the look of the whole app. The palette replaces the stock shadcn greys
+  with warm theme tokens (Ink in `.dark`, the default; Daybook paper in `:root`), fonts
+  move from Lilex to Inter Tight (sans, the user's words) and Newsreader (italic serif,
+  nexo's own words), with Lilex kept as the mono. Done Tasks get a hand-drawn ink
+  strikethrough (`.ink-strike`). `src/test/palette-contrast.test.ts` checks every text
+  token at 4.5:1 in both themes. Rules recorded in `CODING_STANDARDS.md`. Updates
+  section 12.
 - 2026-11-26 - Carried-over Tasks (issue #31): `today()` now also returns open Tasks
   planned for an earlier day, each flagged `carriedOver`, in the order they were added,
   and never Tasks planned for a later day. The rules sit in `src/tasks/carry-over.ts`,

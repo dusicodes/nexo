@@ -41,7 +41,7 @@ export function DetailsText({ details }: { details: string }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline underline-offset-2 hover:text-foreground"
+        className="text-link underline underline-offset-2 hover:text-link-hover"
       >
         {url}
       </a>,

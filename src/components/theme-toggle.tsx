@@ -23,7 +23,8 @@ export function ThemeToggle() {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
+      className="text-muted-foreground"
       size="icon"
       aria-label={`Switch to ${next} theme`}
       onClick={() => {
