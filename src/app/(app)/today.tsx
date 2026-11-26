@@ -2,16 +2,18 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "cn";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
 import type { TaskSnapshot, TodayTask } from "@/tasks/tasks";
 import { DetailsText } from "./details-text";
 import {
   addTask,
+  completeTask,
   deleteTask,
   loadToday,
   renameTask,
+  reopenTask,
   restoreTask,
   setTaskChecklistItem,
   setTaskDetails,
@@ -53,6 +55,15 @@ function formatHeading(localDate: LocalDate): string {
 
 /** A Task on the page; `saving` until the server has confirmed it. */
 type ShownTask = TodayTask & { saving?: boolean };
+
+/**
+ * Today's order: open Tasks first, then done ones, each oldest first. A line
+ * still saving has no seq yet, so it sits at the bottom of the open Tasks.
+ */
+function inTodayOrder(tasks: ShownTask[]): ShownTask[] {
+  const done = (task: ShownTask) => (task.completedDay === null ? 0 : 1);
+  return tasks.toSorted((a, b) => done(a) - done(b) || a.seq - b.seq);
+}
 
 /** The Tasks on the page and the day they were loaded for. */
 type ShownDay = { day: LocalDate; tasks: ShownTask[] };
@@ -138,6 +149,7 @@ export function Today() {
         title: title.trim(),
         details: "",
         plannedDay: day,
+        completedDay: null,
         seq: Infinity,
         saving: true,
       },
@@ -206,6 +218,26 @@ export function Today() {
     enqueue(id, () => setTaskDetails(id, details)).catch(() =>
       setError("Couldn't save those Details. Try again."),
     );
+  };
+
+  // Ticks a Task done (or unticks it to reopen it) on the page at once, then
+  // on the server; if that fails, the Task goes back to how it was.
+  const setDone = (task: ShownTask, done: boolean) => {
+    const completedDay = done ? currentLocalDate() : null;
+    const mark = (to: LocalDate | null) =>
+      updateTasks((tasks) =>
+        tasks.map((shownTask) =>
+          shownTask.id === task.id ? { ...shownTask, completedDay: to } : shownTask,
+        ),
+      );
+    setError(null);
+    mark(completedDay);
+    enqueue(task.id, () =>
+      completedDay === null ? reopenTask(task.id) : completeTask(task.id, completedDay),
+    ).catch(() => {
+      mark(task.completedDay);
+      setError(`Couldn't ${done ? "complete" : "reopen"} that Task. Try again.`);
+    });
   };
 
   // Ticks or unticks a Checklist item on the page at once, then on the server;
@@ -300,7 +332,7 @@ export function Today() {
 
       {tasks !== null && (
         <ul className="mt-8 flex flex-col" aria-label="Tasks">
-          {tasks.map((task) => (
+          {inTodayOrder(tasks).map((task) => (
             <TaskLine
               key={task.id}
               task={task}
@@ -309,6 +341,7 @@ export function Today() {
               onTitleChange={(title) => saveTitle(task.id, title)}
               onDetailsChange={(details) => saveDetails(task.id, details)}
               onChecklistItemTick={(lineIndex, ticked) => tickItem(task.id, lineIndex, ticked)}
+              onDoneChange={(done) => setDone(task, done)}
               onDelete={() => deleteWithUndo(task)}
               onEmptied={() => {
                 deleteEmptied(task);
@@ -496,6 +529,7 @@ function TaskLine({
   onTitleChange,
   onDetailsChange,
   onChecklistItemTick,
+  onDoneChange,
   onDelete,
   onEmptied,
 }: {
@@ -506,6 +540,7 @@ function TaskLine({
   onTitleChange: (title: string) => void;
   onDetailsChange: (details: string) => void;
   onChecklistItemTick: (lineIndex: number, ticked: boolean) => void;
+  onDoneChange: (done: boolean) => void;
   onDelete: () => void;
   onEmptied: () => void;
 }) {
@@ -567,6 +602,7 @@ function TaskLine({
 
   // The Details as the page shows them: what is being typed, else what is saved.
   const details = detailsEdit?.value ?? task.details;
+  const done = task.completedDay !== null;
 
   return (
     <li
@@ -575,8 +611,25 @@ function TaskLine({
         task.saving && "opacity-60",
       )}
     >
-      <TaskBox />
-      <div className="min-w-0 flex-1">
+      <span className="relative mt-1.5 flex size-4 shrink-0">
+        <input
+          type="checkbox"
+          checked={done}
+          disabled={task.saving}
+          aria-label={`${done ? "Reopen" : "Complete"} Task: ${task.title}`}
+          className="peer size-4 cursor-pointer appearance-none rounded-[5px] border border-muted-foreground/50 checked:border-foreground checked:bg-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default"
+          onChange={(event) => onDoneChange(event.target.checked)}
+        />
+        <Check
+          aria-hidden="true"
+          strokeWidth={3}
+          className="pointer-events-none absolute inset-0 m-auto hidden size-3 text-background peer-checked:block"
+        />
+      </span>
+      {/* While the Task is done, everything under it reads as done: its title and
+          Details are struck through and its Checklist items show ticked. Their
+          saved ticks are kept, so reopening it shows them as they were. */}
+      <div className={cn("min-w-0 flex-1", done && "text-muted-foreground line-through")}>
         {titleEdit === null ? (
           <button
             ref={titleButton}
@@ -691,8 +744,8 @@ function TaskLine({
                   <div key={lineIndex} data-line={lineIndex} className="flex items-start gap-2">
                     <input
                       type="checkbox"
-                      checked={line.ticked}
-                      disabled={task.saving}
+                      checked={done || line.ticked}
+                      disabled={task.saving || done}
                       aria-label={`Checklist item: ${line.text}`}
                       className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
                       onChange={(event) => onChecklistItemTick(lineIndex, event.target.checked)}
@@ -729,7 +782,7 @@ function TaskLine({
   );
 }
 
-/** The checkbox square in front of each line; it becomes interactive with completing Tasks. */
+/** The checkbox square in front of the new line, before it is a Task. */
 function TaskBox({ faint = false }: { faint?: boolean }) {
   return (
     <span

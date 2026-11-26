@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
 import { normaliseDetails, tickChecklistItem } from "./details";
@@ -23,6 +23,8 @@ export type TodayTask = {
   /** Plain text under the title, exactly as typed; empty when there are none. */
   details: string;
   plannedDay: LocalDate;
+  /** The local day the Task was completed; null while it is open. */
+  completedDay: LocalDate | null;
   /** Where the Task stands: Today lists Tasks by ascending seq. */
   seq: number;
 };
@@ -33,6 +35,7 @@ function toTodayTask(row: TaskSnapshot): TodayTask {
     title: row.title,
     details: row.details,
     plannedDay: row.plannedDay,
+    completedDay: row.completedDay,
     seq: row.seq,
   };
 }
@@ -77,14 +80,23 @@ export async function add(title: string, localDate: LocalDate): Promise<TodayTas
   return toTodayTask(created);
 }
 
-/** What Today shows for `localDate`, oldest (first added) first. */
+/**
+ * What Today shows for `localDate`: the open Tasks planned for it, then the
+ * Tasks completed on it, each group oldest (first added) first. A done Task
+ * leaves Today when the day ends but stays stored.
+ */
 export async function today(localDate: LocalDate): Promise<TodayTask[]> {
   assertLocalDate(localDate);
   const rows = await getDb()
     .select()
     .from(tasks)
-    .where(eq(tasks.plannedDay, localDate))
-    .orderBy(asc(tasks.seq));
+    .where(
+      or(
+        and(eq(tasks.plannedDay, localDate), isNull(tasks.completedDay)),
+        eq(tasks.completedDay, localDate),
+      ),
+    )
+    .orderBy(sql`${tasks.completedDay} is not null`, asc(tasks.seq));
   return rows.map(toTodayTask);
 }
 
@@ -115,6 +127,33 @@ export async function setDetails(id: string, details: string): Promise<TodayTask
     throw new TaskNotFoundError(id);
   }
   return toTodayTask(updated);
+}
+
+/** Marks a Task done on `localDate`. Its Details, Checklist items included, stay as they are. */
+export async function complete(id: string, localDate: LocalDate): Promise<TodayTask> {
+  assertLocalDate(localDate);
+  const [completed] = await getDb()
+    .update(tasks)
+    .set({ completedDay: localDate, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  if (completed === undefined) {
+    throw new TaskNotFoundError(id);
+  }
+  return toTodayTask(completed);
+}
+
+/** Reopens a done Task, putting it back among the open Tasks in its old place. */
+export async function reopen(id: string): Promise<TodayTask> {
+  const [reopened] = await getDb()
+    .update(tasks)
+    .set({ completedDay: null, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  if (reopened === undefined) {
+    throw new TaskNotFoundError(id);
+  }
+  return toTodayTask(reopened);
 }
 
 /**

@@ -47,6 +47,22 @@ export async function setTaskDetails(id: string, details: string): Promise<tasks
   return tasks.setDetails(id, details);
 }
 
+export async function completeTask(id: string, localDate: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string") {
+    throw new Error("A Task id must be text.");
+  }
+  return tasks.complete(id, localDate);
+}
+
+export async function reopenTask(id: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string") {
+    throw new Error("A Task id must be text.");
+  }
+  return tasks.reopen(id);
+}
+
 export async function setTaskChecklistItem(
   id: string,
   lineIndex: number,

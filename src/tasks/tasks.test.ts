@@ -206,4 +206,74 @@ describe("Tasks", () => {
       tasks.TaskNotFoundError,
     );
   });
+  it("marks a Task done on the day it is completed", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-13");
+    expect(task.completedDay).toBeNull();
+
+    const done = await tasks.complete(task.id, "2026-12-13");
+
+    expect(done.completedDay).toBe("2026-12-13");
+    expect((await tasks.today("2026-12-13"))[0].completedDay).toBe("2026-12-13");
+  });
+  it("lists open Tasks first and done Tasks below them, each oldest first", async () => {
+    const first = await tasks.add("First", "2026-12-14");
+    await tasks.add("Second", "2026-12-14");
+    const third = await tasks.add("Third", "2026-12-14");
+    await tasks.add("Fourth", "2026-12-14");
+
+    await tasks.complete(third.id, "2026-12-14");
+    await tasks.complete(first.id, "2026-12-14");
+
+    expect((await tasks.today("2026-12-14")).map((shown) => shown.title)).toEqual([
+      "Second",
+      "Fourth",
+      "First",
+      "Third",
+    ]);
+  });
+
+  it("drops a done Task from the next day's Today but keeps it stored", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-15");
+    await tasks.complete(task.id, "2026-12-15");
+
+    expect(await tasks.today("2026-12-16")).toEqual([]);
+    expect(await tasks.delete(task.id)).toMatchObject({
+      title: "Pay rent",
+      completedDay: "2026-12-15",
+    });
+  });
+  it("reopens a done Task back into the open group", async () => {
+    const first = await tasks.add("First", "2026-12-17");
+    await tasks.add("Second", "2026-12-17");
+    await tasks.complete(first.id, "2026-12-17");
+
+    const reopened = await tasks.reopen(first.id);
+
+    expect(reopened.completedDay).toBeNull();
+    expect((await tasks.today("2026-12-17")).map((shown) => shown.title)).toEqual([
+      "First",
+      "Second",
+    ]);
+  });
+
+  it("leaves a Task's Checklist items as they are when it is completed and reopened", async () => {
+    const task = await tasks.add("Write the post", "2026-12-18");
+    await tasks.setDetails(task.id, "[x] Draft\n[] Edit");
+
+    expect((await tasks.complete(task.id, "2026-12-18")).details).toBe("[x] Draft\n[] Edit");
+    expect((await tasks.reopen(task.id)).details).toBe("[x] Draft\n[] Edit");
+  });
+
+  it("refuses to complete or reopen a Task that does not exist", async () => {
+    await expect(tasks.complete("no-such-task", "2026-12-19")).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+    await expect(tasks.reopen("no-such-task")).rejects.toBeInstanceOf(tasks.TaskNotFoundError);
+  });
+
+  it("refuses to complete a Task on a day that is not a local date", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-20");
+
+    await expect(tasks.complete(task.id, "20/12/2026")).rejects.toThrow("Not a local date");
+  });
 });
