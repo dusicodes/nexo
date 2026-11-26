@@ -3,7 +3,7 @@
 > **Document status:** initial comprehensive draft, updated as the foundation lands. The
 > repository now holds product documentation (`PRD.md`, `README.md`) plus the first
 > foundation slice: the application scaffold, the local data layer, the auth
-> foundation (Google sign-in, email allowlist, session gate), and the AI/MCP seams. No product features exist yet. Status markers are
+> foundation (Google sign-in, email allowlist, session gate), and the AI/MCP seams, plus the first product slice: Today, a page of Tasks (issue #35). Status markers are
 > the contract: treat no `selected`/`proposed`/`deferred` item as a claim that working
 > code exists.
 
@@ -132,10 +132,15 @@ Boundary rules:
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
 | Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
+| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Tested against in-memory PGlite with the real migrations | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
   and the AI tool layer mutate data through the same repositories; no ad-hoc SQL anywhere.
+- **Repositories so far:** the Tasks module is the first. The Today page reaches it
+  through Server Functions (`src/app/(app)/today-actions.ts`), each of which checks the
+  session itself before calling it. Assistant tools calling the same module is
+  `selected` (D4).
 - **Sync-ready by construction:** because every read and write passes through
   repositories, a future sync layer can be introduced without touching UI or agent code.
   Until then, nexo is explicitly single-machine; the architecture does not pretend
@@ -162,8 +167,11 @@ provider data before it is cached into the local database.
 
 **Testing seams** (deliberate places where fakes substitute for real systems):
 
-- Repository interface: in-memory fake for unit tests; no real database, no network.
-  Exception: the auth seam tests run the real Better Auth instance against an in-process
+- Repositories: tested through their public interface against an in-memory PGlite
+  database with the real migrations applied (`src/test/test-database.ts`); no network.
+  PGlite in memory is fast enough that a hand-written fake would only add a second
+  implementation to keep in step. The Tasks module is the first (`src/tasks/tasks.test.ts`).
+  The auth seam tests run the real Better Auth instance against an in-process
   PGlite database (`src/lib/auth.integration.test.ts`, the route handler test), because
   "a rejected sign-in writes no rows" cannot be checked against a fake.
 - Provider adapters: fake providers return fixtures and record calls; CI never touches
@@ -330,6 +338,9 @@ SQLite still pending); the auth foundation - Better Auth with migrated auth tabl
 Google sign-in route, login page and sign-out button, the email allowlist, and the
 session gate; and the AI SDK seams - DeepSeek provider, single-step
 assistant hook, MCP client and tool bridge (registry and enforcement still pending).
+The first product slice has started: the signed-in home page is Today, where the owner
+writes Tasks for the day (issue #35, part of spec #29); completing, carry-over, editing,
+Details and Checklist items follow in later tickets.
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -342,8 +353,8 @@ out-of-scope sections, and change only with the PRD):
 - **Phase 0, foundation (now):** this document; project scaffold; Drizzle schema and
   repositories over PGlite/SQLite; auth for server capabilities; AI orchestration behind
   the provider adapter; the tool permission registry and confirmation UI; CI. The first
-  part landed with the foundation slice (issue #2); repositories, the registry,
-  confirmation UI, and CI remain.
+  part landed with the foundation slice (issue #2), and the first repository (Tasks)
+  with issue #35; further repositories, the registry, and confirmation UI remain.
 - **Phase 1, v1:** the daily planning loop, todo list, read-first GitHub dashboard, and
   reading list from the PRD's v1 scope.
 - **Phase 2 (deferred):** calendar with AI time-blocking (Google Calendar / Notion) and
@@ -371,6 +382,11 @@ out-of-scope sections, and change only with the PRD):
 - **D9** Finance integrations permanently read-only, no write actions ever (`selected`).
 - **D10** Sync deferred until v1 works on one machine; the repository seam keeps the
   option cheap (`selected`).
+- **D11** Local calendar days as text: a Task's Planned day and completion day are the
+  owner's own calendar days, stored as `YYYY-MM-DD` text and sent by the browser, never
+  instants the server converts with a guessed time zone. The day switches at the owner's
+  local midnight, and the column stays portable to SQLite (`implemented` for the Planned
+  day, issue #35; the completion day follows with issue #30).
 
 **Recording further decisions:** significant decisions beyond this list get a dated entry
 in the change log below; decisions with long-term consequences also get a short ADR in
@@ -389,7 +405,8 @@ in the change log below; decisions with long-term consequences also get a short 
   conflicts with the local-first principle that local features work without a network or
   account. Decide whether the browser build should later run its local core signed out
   (narrowing the gate) or keep requiring sign-in. Revisit when the first local feature
-  ships.
+  ships. Today (issue #35) is that feature; for now it stays behind the sign-in gate and
+  needs the Next.js server, so the static desktop export does not have it.
 - **Server at all?** Whether a hosted or self-hosted server remains in the product, or
   the desktop app becomes the primary shape. Decides how much to invest in the Postgres
   server path.
@@ -421,6 +438,15 @@ link); update section 13 for lasting decisions; write a short ADR in
 `docs/architecture/decisions/` for decisions with long-term consequences.
 
 **Change log:**
+
+- 2026-11-26 - Today, the first product slice (issue #35, spec #29): a `tasks` table and
+  the Tasks module as the first repository; the signed-in home page becomes Today, a
+  client page that sends the browser's local day to session-checked Server Functions.
+  Adding a Task and listing Today's Tasks are implemented; the rest of the spec follows
+  in issues #30-#34 and #36. Why local days as text: "today" is the owner's own day, so
+  the browser decides it and the day switches at local midnight. Tests share a new
+  database-only helper (`src/test/test-database.ts`) that the auth test helper now
+  builds on. Updates sections 6, 7, 12, 13 (D11) and 14.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

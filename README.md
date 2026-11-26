@@ -110,7 +110,7 @@ Each area is labeled with its current status. Nothing in the "planned" rows is s
 | Application foundation | The runnable app shell, local data layer, and auth | Foundation, in progress |
 | Architecture documentation | `architecture.md` describing the technical design | Foundation, in progress |
 | Daily planning loop | Assistant plans the day from todos and produces a daily summary | Planned, v1 focus |
-| AI todo list | Capture, organize, and summarize tasks | Planned, v1 focus |
+| Today and Tasks | A calm page of the day's Tasks; AI summaries come later | In progress, v1 focus ([spec #29](https://github.com/dusicodes/nexo/issues/29)) |
 | GitHub dashboard | Unfinished PRs, pending reviews, next-build suggestions | Planned, v1 focus |
 | Reading list | Save and organize articles to read later | Planned, v1 focus |
 | Unified inbox | One triage view for work, school, and personal streams | Planned, after v1 |
@@ -192,8 +192,9 @@ The selected technical direction from `PRD.md` and the foundation work. These ar
 ## Development
 
 The foundation slice is in place: the runnable app shell, the local data layer,
-the auth configuration, and the AI/MCP seams. No product features or screens
-are implemented yet.
+the auth configuration, and the AI/MCP seams. The first product screen is in
+progress: after signing in, the home page is **Today**, where you write the day's
+Tasks (see `GLOSSARY.md` for the terms).
 
 ### Requirements
 
