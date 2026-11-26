@@ -15,3 +15,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - UI work: follow `CODING_STANDARDS.md`, "Design language"; reference mockups are in `docs/design/`.
 - Dev server: `npm run dev` migrates, then starts pglite-server (sole owner of `.data/nexo`) running `next dev` on `http://localhost:3000`. It is often already running; check the port before starting another. Its log is `.next/dev/logs/next-development.log`. Never open `.data/nexo` from a second process while it runs (no `db:migrate`, no plain `next dev`).
 - Signed-in checks: with the dev server running, `curl -c jar -L "http://localhost:3000/api/dev/session?callbackURL=/"` signs in as the first allowlisted email (development only; see `src/app/api/dev/session/route.ts`).
+- States the page cannot create (Tasks planned for earlier days, say): `npm run dev:sql -- "<sql>"` runs one statement through the running dev server's pglite-server; remove what you add.

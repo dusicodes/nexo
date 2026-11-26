@@ -35,7 +35,8 @@ New UI follows these rules, and review treats a departure from them as a defect.
   them and remembers the choice. Themes change colours only, never layout.
 - **Colours are theme tokens.** Use the tokens in `src/app/globals.css`
   (`background`, `foreground`, `muted-foreground`, `faint`, `link`, `link-hover`,
-  `mark`, `mark-faint`, `checklist`, plus the shadcn set), never a one-off colour. A
+  `mark`, `mark-faint`, `checklist`, plus the shadcn set), never a one-off colour
+  (`npm run lint` rejects raw colours in components). A
   new colour is a new token with a value in both `:root` and `.dark`.
   `src/test/palette-contrast.test.ts` holds every text colour used under `src/` to 4.5:1
   in both themes; `mark` and `mark-faint` are for ink marks, never text.

@@ -18,3 +18,15 @@ export function useTestDatabase() {
     vi.unstubAllEnvs();
   });
 }
+
+/**
+ * Removes every Task, so a test starts from an empty Today. Open Tasks carry
+ * over to later days (GLOSSARY.md, Carried-over Task), so tests that share a
+ * database cannot stay apart by using different days. Test setup only: outside
+ * tests, Tasks are read and written only through the Tasks module.
+ */
+export async function clearTasks() {
+  const { getDb } = await import("@/db/client");
+  const { tasks } = await import("@/db/schema");
+  await getDb().delete(tasks);
+}

@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { useTestDatabase } from "@/test/test-database";
+import { clearTasks, useTestDatabase } from "@/test/test-database";
 import { isOnToday } from "./carry-over";
 
 type Tasks = typeof import("./tasks");
@@ -13,13 +13,9 @@ describe("Tasks", () => {
     tasks = await import("./tasks");
   });
 
-  // The database is shared by the whole file. Open Tasks carry over to later
-  // days, so each test starts with no Tasks stored.
-  beforeEach(async () => {
-    const { getDb } = await import("@/db/client");
-    const { tasks: table } = await import("@/db/schema");
-    await getDb().delete(table);
-  });
+  // The database is shared by the whole file, and open Tasks carry over to
+  // later days, so each test starts with no Tasks stored.
+  beforeEach(clearTasks);
 
   it("shows a Task added today on Today", async () => {
     await tasks.add("Email the hiring manager", "2026-11-26");

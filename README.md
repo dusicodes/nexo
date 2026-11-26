@@ -226,6 +226,7 @@ npm run lint           # ESLint
 npm run db:generate    # create a SQL migration from src/db/schema changes
 npm run db:migrate     # apply migrations to the configured database
 npm run db:studio      # visual database browser (Postgres server only)
+npm run dev:sql -- "…"  # run one SQL statement against the running dev database
 npm run tauri dev      # desktop shell against the web dev server
 npm run tauri build    # production desktop bundle
 ```
