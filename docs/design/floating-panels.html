@@ -1,0 +1,474 @@
+<!-- Reference mockup for ADR 0001 (floating Panels around a Focus). Published at https://claude.ai/artifact/LHs76Tw8xj2sP8DYof6qRw. Open this file in a browser to try it; example data only. -->
+<title>nexo Floating Panels</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap">
+<style>
+/* Layout: one Focus column centred on a warm desk; glass Panels float on top, tilted, and can be
+   dragged anywhere, torn apart (Email accounts) or pushed off an edge to tuck them away. */
+:root {
+  --ground: #1b1a18; --ink: #ebe7df; --muted: #a8a196; --faint: #7a7366; --link: #d9a066;
+  --sheet: rgba(235, 231, 223, 0.05); --slip: #2a2825; --well: rgba(235, 231, 223, 0.07);
+  --shadow: rgba(0, 0, 0, 0.42); --drop: rgba(235, 231, 223, 0.35);
+  --clay: #d69072; --moss: #98b585; --sea: #7eaec2; --plum: #bb93bf; --ochre: #d9b766;
+  --sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --serif: "Newsreader", Georgia, "Times New Roman", serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --ground: #f4f0e8; --ink: #24211c; --muted: #6b655a; --faint: #a39b8b; --link: #7a4b1e;
+  --sheet: rgba(255, 253, 248, 0.6); --slip: #fbf8f2; --well: rgba(36, 33, 28, 0.06);
+  --shadow: rgba(70, 52, 24, 0.16); --drop: rgba(36, 33, 28, 0.3);
+  --clay: #a8522f; --moss: #4f7339; --sea: #2f6f88; --plum: #7c4a82; --ochre: #8a6512; color-scheme: light;
+} }
+:root[data-theme="light"] {
+  --ground: #f4f0e8; --ink: #24211c; --muted: #6b655a; --faint: #a39b8b; --link: #7a4b1e;
+  --sheet: rgba(255, 253, 248, 0.6); --slip: #fbf8f2; --well: rgba(36, 33, 28, 0.06);
+  --shadow: rgba(70, 52, 24, 0.16); --drop: rgba(36, 33, 28, 0.3);
+  --clay: #a8522f; --moss: #4f7339; --sea: #2f6f88; --plum: #7c4a82; --ochre: #8a6512; color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 15px; overflow: hidden; }
+.serif { font-family: var(--serif); font-style: italic; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+input { font: inherit; color: inherit; }
+:focus-visible { outline: 1.5px solid var(--muted); outline-offset: 3px; border-radius: 6px; }
+
+#stage { position: relative; height: 100%; overflow: hidden; }
+#focus {
+  position: relative; z-index: 0; height: 100%; overflow-y: auto; box-sizing: border-box; padding-block: 72px 120px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.column { max-width: 600px; margin: 0 auto; }
+.enter { animation: enter 260ms ease-out; }
+@keyframes enter { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.eyebrow { font-size: 19px; color: var(--muted); margin: 0; }
+h1 { margin: 2px 0 0; font-size: 40px; font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+h3 { margin: 36px 0 10px; font-weight: 400; font-size: 16px; color: var(--muted); }
+.tasks { list-style: none; margin: 36px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.task { display: flex; gap: 14px; align-items: flex-start; padding: 4px 0; }
+.box { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; margin-top: 6px; }
+.box.done { background: var(--muted); }
+.box.ghost { border-style: dashed; border-color: var(--faint); }
+.title { font-size: 17px; line-height: 28px; }
+.title.done { color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.hint { font-size: 14px; color: var(--muted); margin-left: 8px; }
+.details { font-size: 14px; line-height: 22px; color: var(--muted); white-space: pre-wrap; }
+.details a { color: var(--link); }
+.write { flex: 1; min-width: 0; background: none; border: 0; outline: none; font-size: 17px; line-height: 28px; }
+.write::placeholder, .ask::placeholder { font-family: var(--serif); font-style: italic; color: var(--faint); }
+.row { padding: 8px 0; font-size: 17px; }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.state { font-size: 14px; color: var(--link); }
+.meta { font-size: 14px; color: var(--muted); }
+.event { display: flex; gap: 18px; }
+.event.past { opacity: .5; }
+.time { display: inline-block; min-width: 46px; margin-right: 8px; }
+.event .time { min-width: 96px; margin: 0; }
+.mailtop { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.msg { margin: 0; line-height: 1.55; font-size: 17px; }
+.msg.assistant { font-family: var(--serif); font-style: italic; color: var(--muted); font-size: 18px; }
+.chat { display: flex; flex-direction: column; gap: 14px; }
+.ask { width: 100%; box-sizing: border-box; border: 0; outline: none; background: var(--well); border-radius: 10px; padding: 9px 12px; font-size: 16px; }
+.ask:focus-visible { outline: 1.5px solid var(--muted); }
+.tabs { display: flex; gap: 18px; margin-top: 28px; }
+.tabs button { color: var(--muted); font-family: var(--serif); font-style: italic; font-size: 16px; padding-bottom: 4px; border-bottom: 1.5px solid transparent; }
+.tabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+/* Panels: tilted glass sheets that straighten while held */
+.panel {
+  position: absolute; box-sizing: border-box; width: 300px; padding: 18px 20px; border-radius: 18px; touch-action: none; user-select: none; cursor: pointer;
+  background: var(--sheet); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 44px var(--shadow);
+  transition: transform 180ms, box-shadow 180ms, left 220ms, top 220ms, outline-color 150ms; outline: 1.5px dashed transparent; outline-offset: 4px;
+}
+.panel.dragging { cursor: grabbing; transition: none; box-shadow: 0 30px 80px var(--shadow); transform: scale(1.015) !important; }
+.panel.drop-target { outline-color: var(--drop); }
+.panel.leaving { opacity: .55; }
+.panel header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.panel h2 { margin: 0; font-size: 15px; font-weight: 400; color: var(--muted); }
+.panel .tools { display: flex; align-items: center; gap: 6px; }
+.panel .expand { color: var(--muted); font-size: 14px; padding: 0 4px; }
+.panel .expand:hover { color: var(--ink); }
+.panel .list { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.panel .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.panel .mini { display: flex; gap: 9px; align-items: center; min-width: 0; }
+.panel .mini .box { width: 11px; height: 11px; margin: 0; border-width: 1.25px; }
+.panel .mini button.box:hover { border-color: var(--ink); }
+.panel .line.done { color: var(--faint); text-decoration: line-through; }
+.panel .foot { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.panel .next { margin: 0 0 8px; font-size: 14px; color: var(--link); }
+.panel .msg { font-size: 14px; }
+.panel .msg.assistant { font-size: 15px; }
+.panel .ask { font-size: 14px; padding: 7px 10px; }
+
+/* Colours: a tint washes the sheet and colours the Panel's name */
+[data-tint="clay"] { --tint: var(--clay); } [data-tint="moss"] { --tint: var(--moss); } [data-tint="sea"] { --tint: var(--sea); }
+[data-tint="plum"] { --tint: var(--plum); } [data-tint="ochre"] { --tint: var(--ochre); }
+.panel[data-tint] { background-image: linear-gradient(color-mix(in srgb, var(--tint) 15%, transparent), color-mix(in srgb, var(--tint) 15%, transparent)); }
+.panel[data-tint] h2 { color: var(--tint); }
+.swatch { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--muted); opacity: 0; transition: opacity 150ms; }
+.panel:hover .swatch, .panel:focus-within .swatch, .swatch[aria-expanded="true"] { opacity: 1; }
+.panel[data-tint] .swatch { background: var(--tint); border-color: var(--tint); }
+.tints { display: flex; gap: 8px; margin: -2px 0 12px; }
+.tints button { width: 18px; height: 18px; border-radius: 50%; background: var(--tint, transparent); border: 1.5px solid var(--tint, var(--muted)); }
+.tints button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ground), 0 0 0 3.5px var(--ink); }
+.tints .clear { position: relative; }
+.tints .clear::after { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1.5px; background: var(--muted); transform: rotate(45deg); }
+
+/* Email accounts: tags, and chips you can drag out of the Email Panel */
+.acct { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.acct::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tint); }
+.chips { display: flex; gap: 8px; margin: -2px 0 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 3px 9px 3px 7px; border-radius: 999px; background: var(--well); cursor: grab; touch-action: none; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tint); }
+.chip:hover { color: var(--ink); }
+
+/* Tucked Panels: pushed off an edge, a slip peeks in; hover slides it out, click focuses it */
+.slip {
+  position: absolute; width: 230px; box-sizing: border-box; padding: 14px 16px; border-radius: 14px;
+  background: var(--slip); box-shadow: 0 10px 30px var(--shadow); cursor: pointer; touch-action: none; user-select: none;
+  transition: transform 220ms cubic-bezier(.2, .8, .3, 1);
+}
+.slip.left { left: 0; transform: translateX(calc(-100% + 30px)) rotate(1.2deg); padding-right: 40px; }
+.slip.right { right: 0; transform: translateX(calc(100% - 30px)) rotate(-1.2deg); padding-left: 40px; }
+.slip.left:hover, .slip.left:focus-visible { transform: translateX(calc(-100% + 150px)) rotate(0.4deg); }
+.slip.right:hover, .slip.right:focus-visible { transform: translateX(calc(100% - 150px)) rotate(-0.4deg); }
+.slip.dragging { transition: none; }
+.slip .spine {
+  position: absolute; top: 0; bottom: 0; width: 30px; display: flex; align-items: center; justify-content: center;
+  writing-mode: vertical-rl; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--muted);
+}
+.slip.left .spine { right: 0; transform: rotate(180deg); }
+.slip.right .spine { left: 0; }
+.slip[data-tint] .spine { color: var(--tint); }
+.slip[data-tint].left { box-shadow: inset -3px 0 0 var(--tint), 0 10px 30px var(--shadow); }
+.slip[data-tint].right { box-shadow: inset 3px 0 0 var(--tint), 0 10px 30px var(--shadow); }
+.slip .peek { font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.slip .peek .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slip .peek .meta { font-size: 12px; }
+
+/* Narrow screens: a plain nav bar, no Panels */
+#nav { display: none; gap: 20px; padding: 16px max(16px, env(safe-area-inset-left, 0px)) 0; overflow-x: auto; font-size: 15px; }
+#nav button { color: var(--muted); font-family: var(--serif); font-style: italic; white-space: nowrap; }
+#nav button[aria-current="page"] { color: var(--ink); font-family: var(--sans); font-style: normal; }
+
+#reset { position: fixed; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 100; color: var(--faint); font-size: 14px; }
+#reset:hover { color: var(--muted); text-decoration: underline; }
+#help { position: fixed; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 100; margin: 0; color: var(--faint); font-size: 13px; text-align: right; }
+
+@media (max-width: 760px) {
+  #nav { display: flex; }
+  .panel, .slip, #reset, #help { display: none; }
+  #focus { padding-top: 40px; }
+  h1 { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .enter { animation: none; } .panel, .slip { transition: none; } }
+</style>
+
+<div id="stage">
+  <nav id="nav" aria-label="Features"></nav>
+  <main id="focus"></main>
+  <div id="panels"></div>
+  <button id="reset" class="serif" type="button">Reset layout</button>
+  <p id="help" class="serif">Drag a Panel off an edge to tuck it away · drag an account out of Email to give it its own Panel</p>
+</div>
+
+<script>
+// Prototype of nexo's floating-Panel layout, with example data only.
+const W = 300;
+const LABEL = { assistant: "Assistant", today: "Today", calendar: "Calendar", email: "Email",
+  "email-personal": "Personal email", "email-school": "Work & school email", github: "GitHub", reading: "Reading list" };
+const ACCOUNTS = { personal: { label: "Personal", tint: "sea" }, school: { label: "Work & school", tint: "plum" } };
+const TINTS = ["clay", "moss", "sea", "plum", "ochre"];
+const TILT = { assistant: -0.6, today: 0.7, calendar: -0.8, email: 0.5, "email-personal": -0.5, "email-school": 0.8, github: 0.6, reading: -0.7 };
+
+const state = {
+  focus: "assistant",
+  layout: null,                                   // feature -> { x, y } while floating
+  tucked: load("nexo-proto-tucked") || {},        // feature -> { side, y } while tucked away
+  detached: load("nexo-proto-detached") || [],    // Email accounts torn out into their own Panel
+  colors: load("nexo-proto-colors") || {},
+  order: [],
+  picking: null,
+  emailTab: "all",
+  tasks: [
+    { id: 1, title: "Plan the Previous view", done: false, hint: "from Tuesday" },
+    { id: 2, title: "Email the hiring manager", done: false, details: "Ask about the take-home deadline\nhttps://mail.google.com" },
+    { id: 3, title: "Review feedback on #37", done: false },
+    { id: 4, title: "Read the PGlite release notes", done: false },
+    { id: 5, title: "Pay rent", done: true },
+  ],
+  messages: [{ from: "assistant", text: "Morning. You have 4 open Tasks, one carried over from Tuesday, and a call with the hiring manager at 11:00. Want a suggested order?" }],
+};
+const EVENTS = [
+  { time: "09:30", end: "09:45", title: "Standup", where: "Google Meet", past: true },
+  { time: "11:00", end: "11:30", title: "Call with the hiring manager", where: "Phone" },
+  { time: "14:00", end: "15:30", title: "Deep work: Previous view", where: "Blocked by the Assistant" },
+  { time: "17:30", end: "18:30", title: "Gym", where: "Pure Gym, Leeds" },
+];
+const EMAILS = [
+  { account: "personal", from: "Acme hiring team", subject: "Your take-home: deadline moved to Monday", time: "08:12", important: true },
+  { account: "school", from: "Dr Okafor, module leader", subject: "Coursework 2 feedback is up", time: "07:55", important: true },
+  { account: "school", from: "University registrar", subject: "Module choices close on Friday", time: "Yesterday", important: true },
+  { account: "personal", from: "Landlord", subject: "Rent reminder for December", time: "Yesterday", important: true },
+  { account: "personal", from: "GitHub", subject: "[nexo] Review requested on #38", time: "07:40" },
+  { account: "school", from: "Library", subject: "Your loan is due back on Monday", time: "Wed" },
+  { account: "personal", from: "Substack", subject: "This week in local-first", time: "Tue" },
+];
+const PULLS = [
+  { n: 38, title: "feat(today): Details under a Task", state: "Review requested" },
+  { n: 37, title: "feat(today): Today page where you write Tasks", state: "Changes requested" },
+];
+const ISSUES = [{ n: 34, title: "Checklist items" }, { n: 36, title: "Today: visual design (Ink direction)" }, { n: 30, title: "Complete and reopen Tasks" }];
+const ARTICLES = [
+  { title: "Local-first software: you own your data", source: "inkandswitch.com", min: 24 },
+  { title: "Calm technology principles", source: "calmtech.com", min: 6 },
+  { title: "React Server Functions, explained", source: "react.dev", min: 11 },
+  { title: "Designing with less chrome", source: "rauno.me", min: 8 },
+];
+
+function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+function forget(key) { try { localStorage.removeItem(key); } catch {} }
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const linkify = (s) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+const $ = (id) => document.getElementById(id);
+
+// Accounts still inside the combined Email Panel; the last one can't be torn out.
+const combined = () => Object.keys(ACCOUNTS).filter((a) => !state.detached.includes(a));
+const accountOf = (f) => (f === "email-personal" ? "personal" : f === "email-school" ? "school" : null);
+const features = () => ["assistant", "today", "calendar", "email", ...state.detached.map((a) => `email-${a}`), "github", "reading"];
+
+function defaultLayout() {
+  const right = window.innerWidth - W - 32;
+  return {
+    calendar: { x: 36, y: 72 }, github: { x: 64, y: 330 }, reading: { x: 30, y: 570 },
+    today: { x: right - 16, y: 80 }, email: { x: right + 8, y: 380 }, assistant: { x: right - 10, y: 600 },
+    "email-personal": { x: right - 180, y: 300 }, "email-school": { x: right - 160, y: 520 },
+  };
+}
+function loadLayout() { state.layout = { ...defaultLayout(), ...(load("nexo-proto-layout-v4") || {}) }; }
+function persist() {
+  save("nexo-proto-layout-v4", state.layout); save("nexo-proto-tucked", state.tucked);
+  save("nexo-proto-detached", state.detached); save("nexo-proto-colors", state.colors);
+}
+
+// ---------- Focus views
+const heading = (eyebrow, title) => `<p class="eyebrow serif">${eyebrow}</p><h1>${title}</h1>`;
+const acctTag = (a) => `<span class="acct" data-tint="${ACCOUNTS[a].tint}">${ACCOUNTS[a].label}</span>`;
+function chatHTML(messages, id) {
+  return `<div class="chat">${messages.map((m) => `<p class="msg ${m.from}">${esc(m.text)}</p>`).join("")}
+    <input id="${id}" class="ask" placeholder="Ask the Assistant…" aria-label="Message the Assistant"></div>`;
+}
+function focusHTML(f) {
+  if (f === "assistant") return `${heading("Thursday 26 November", "Good morning")}<div style="margin-top:36px">${chatHTML(state.messages, "chat-focus")}</div>`;
+  if (f === "today") {
+    return `${heading("Thursday", "26 November")}<ul class="tasks">${state.tasks.map((t) => `
+      <li class="task"><button class="box ${t.done ? "done" : ""}" data-toggle="${t.id}" aria-label="${t.done ? "Reopen" : "Complete"} ${esc(t.title)}"></button>
+        <div><div class="title ${t.done ? "done" : ""}">${esc(t.title)}${t.hint ? `<span class="hint serif">${t.hint}</span>` : ""}</div>
+        ${t.details ? `<div class="details">${linkify(t.details)}</div>` : ""}</div></li>`).join("")}
+      <li class="task"><span class="box ghost"></span><input id="new-task" class="write" placeholder="Write a Task…" aria-label="New Task"></li></ul>`;
+  }
+  if (f === "calendar") {
+    return `${heading("Calendar", "4 events today")}<h3 class="serif">Thursday 26 November</h3>
+      ${EVENTS.map((e) => `<div class="row event ${e.past ? "past" : ""}"><span class="num time">${e.time}–${e.end}</span><div>${esc(e.title)}<div class="meta serif">${e.where}</div></div></div>`).join("")}`;
+  }
+  if (f.startsWith("email")) {
+    const only = accountOf(f);
+    const pool = only ? [only] : combined();
+    const account = only || (state.emailTab !== "all" && pool.includes(state.emailTab) ? state.emailTab : null);
+    const shown = EMAILS.filter((m) => (account ? m.account === account : pool.includes(m.account)));
+    const mail = (m) => `<div class="row"><div class="mailtop"><span>${esc(m.from)}</span><span class="meta">${account ? "" : acctTag(m.account) + " · "}${m.time}</span></div><div class="meta">${esc(m.subject)}</div></div>`;
+    const important = shown.filter((m) => m.important);
+    const tabs = pool.length < 2 ? "" : `<div class="tabs" role="group" aria-label="Email accounts">${["all", ...pool].map((t) =>
+      `<button type="button" data-tab="${t}" aria-pressed="${(account || "all") === t}">${t === "all" ? "All" : ACCOUNTS[t].label}</button>`).join("")}</div>`;
+    return `${heading(LABEL[f], `${important.length} that need you`)}${tabs}
+      <h3 class="serif">Important</h3>${important.map(mail).join("")}<h3 class="serif">Everything else</h3>${shown.filter((m) => !m.important).map(mail).join("")}`;
+  }
+  if (f === "github") {
+    return `${heading("GitHub", "2 reviews, 3 issues")}<h3 class="serif">Waiting on you</h3>
+      ${PULLS.map((p) => `<div class="row"><span class="num">#${p.n}</span> ${esc(p.title)}<div class="state serif">${p.state}</div></div>`).join("")}
+      <h3 class="serif">Open issues</h3>${ISSUES.map((i) => `<div class="row"><span class="num">#${i.n}</span> ${esc(i.title)}</div>`).join("")}`;
+  }
+  return `${heading("Reading list", "4 saved articles")}<h3 class="serif">Unread</h3>
+    ${ARTICLES.map((a) => `<div class="row">${esc(a.title)}<div class="meta serif">${a.source} · ${a.min} min</div></div>`).join("")}`;
+}
+
+// ---------- Panel summaries
+function summaryHTML(f) {
+  if (f === "today") {
+    const open = state.tasks.filter((t) => !t.done);
+    return `<div class="list">${[...open, ...state.tasks.filter((t) => t.done)].slice(0, 6).map((t) => `<div class="mini">
+      <button type="button" class="box ${t.done ? "done" : ""}" data-toggle="${t.id}" aria-label="${t.done ? "Reopen" : "Complete"} ${esc(t.title)}"></button>
+      <span class="line ${t.done ? "done" : ""}">${esc(t.title)}</span></div>`).join("")}</div>
+      <p class="foot serif">${open.length} open · ${state.tasks.length - open.length} done</p>`;
+  }
+  if (f === "calendar") {
+    const next = EVENTS.find((e) => !e.past);
+    return `<p class="next serif">Next: ${esc(next.title)} at ${next.time}</p>
+      <div class="list">${EVENTS.filter((e) => !e.past).map((e) => `<div class="line"><span class="num time">${e.time}</span>${esc(e.title)}</div>`).join("")}</div>
+      <p class="foot serif">${EVENTS.length} events today</p>`;
+  }
+  if (f.startsWith("email")) {
+    const only = accountOf(f);
+    const pool = only ? [only] : combined();
+    const chips = !only && pool.length > 1 ? `<div class="chips">${pool.map((a) =>
+      `<span class="chip" data-account="${a}" data-tint="${ACCOUNTS[a].tint}" title="Drag out to give ${ACCOUNTS[a].label} its own Panel">${ACCOUNTS[a].label}</span>`).join("")}</div>` : "";
+    const mine = EMAILS.filter((m) => pool.includes(m.account));
+    const important = mine.filter((m) => m.important);
+    return `${chips}<div class="list">${important.map((m) => `<div><div class="mailtop"><span class="line">${esc(m.from)}</span>${pool.length > 1 ? acctTag(m.account) : ""}</div>
+      <div class="line meta" style="font-size:12.5px">${esc(m.subject)}</div></div>`).join("")}</div>
+      <p class="foot serif">${important.length} important · ${mine.length - important.length} other unread</p>`;
+  }
+  if (f === "github") {
+    return `<div class="list">${PULLS.map((p) => `<div><div class="line"><span class="num">#${p.n}</span> ${esc(p.title)}</div><div class="state serif" style="font-size:12.5px">${p.state}</div></div>`).join("")}</div>
+      <p class="foot serif">${ISSUES.length} issues open</p>`;
+  }
+  if (f === "reading") {
+    return `<div class="list">${ARTICLES.slice(0, 3).map((a) => `<div class="line">${esc(a.title)}</div>`).join("")}</div>
+      <p class="foot serif">${ARTICLES.length} saved · about ${ARTICLES.reduce((s, a) => s + a.min, 0)} min</p>`;
+  }
+  return chatHTML(state.messages.slice(-2), "chat-panel");
+}
+
+// The few lines a tucked slip shows when it peeks out.
+function peekHTML(f) {
+  if (f === "today") { const open = state.tasks.filter((t) => !t.done); return `<div class="line">${esc(open[0]?.title ?? "All done")}</div><div class="meta serif">${open.length} open</div>`; }
+  if (f === "calendar") { const n = EVENTS.find((e) => !e.past); return `<div class="line">${n.time} ${esc(n.title)}</div><div class="meta serif">next event</div>`; }
+  if (f.startsWith("email")) { const pool = accountOf(f) ? [accountOf(f)] : combined(); const m = EMAILS.find((x) => x.important && pool.includes(x.account)); return `<div class="line">${esc(m.from)}</div><div class="meta serif">${EMAILS.filter((x) => x.important && pool.includes(x.account)).length} important</div>`; }
+  if (f === "github") return `<div class="line">#${PULLS[0].n} ${esc(PULLS[0].title)}</div><div class="meta serif">${PULLS.length} reviews waiting</div>`;
+  if (f === "reading") return `<div class="line">${esc(ARTICLES[0].title)}</div><div class="meta serif">${ARTICLES.length} saved</div>`;
+  return `<div class="line">${esc(state.messages.at(-1).text)}</div>`;
+}
+
+// ---------- Rendering
+function render({ animate = false } = {}) {
+  $("focus").innerHTML = `<div class="column ${animate ? "enter" : ""}">${focusHTML(state.focus)}</div>`;
+  $("nav").innerHTML = features().map((f) => `<button type="button" data-nav="${f}" ${f === state.focus ? 'aria-current="page"' : ""}>${LABEL[f]}</button>`).join("");
+  $("panels").innerHTML = features().filter((f) => f !== state.focus).map((f) => {
+    const tint = state.colors[f] ?? (accountOf(f) ? ACCOUNTS[accountOf(f)].tint : null);
+    const tintAttr = tint ? `data-tint="${tint}"` : "";
+    const z = 10 + state.order.indexOf(f);
+    const tuck = state.tucked[f];
+    if (tuck) {
+      return `<aside class="slip ${tuck.side}" data-slip="${f}" ${tintAttr} tabindex="0" role="button" aria-label="${LABEL[f]}, tucked away. Press Enter to focus."
+          style="top:${tuck.y}px;z-index:${z}"><span class="spine">${LABEL[f]}</span><div class="peek">${peekHTML(f)}</div></aside>`;
+    }
+    const p = state.layout[f];
+    return `<section class="panel" data-panel="${f}" ${tintAttr} tabindex="0" role="group" aria-label="${LABEL[f]} Panel, press Enter to focus"
+        style="left:${p.x}px;top:${p.y}px;z-index:${z};transform:rotate(${TILT[f]}deg)">
+      <header><h2 class="serif">${LABEL[f]}</h2><span class="tools">
+        <button type="button" class="swatch" data-swatch="${f}" aria-label="Colour the ${LABEL[f]} Panel" aria-expanded="${state.picking === f}"></button>
+        ${f === "assistant" ? '<button type="button" class="expand" data-expand aria-label="Focus the Assistant">↗</button>' : ""}</span></header>
+      ${state.picking === f ? `<div class="tints" role="group" aria-label="Panel colour">
+        <button type="button" class="clear" data-tint-pick="" aria-label="No colour" aria-pressed="${!state.colors[f]}"></button>
+        ${TINTS.map((t) => `<button type="button" data-tint="${t}" data-tint-pick="${t}" aria-label="${t}" aria-pressed="${state.colors[f] === t}"></button>`).join("")}</div>` : ""}
+      ${summaryHTML(f)}</section>`;
+  }).join("");
+}
+
+function setFocus(f) {
+  if (!features().includes(f) || f === state.focus) return;
+  // The old Focus becomes a Panel where the new one floated (or, if it was tucked, where it last floated).
+  state.layout[state.focus] = state.layout[f];
+  delete state.tucked[f];
+  state.focus = f; state.picking = null;
+  persist(); render({ animate: true });
+}
+const raise = (f) => { state.order = [...state.order.filter((x) => x !== f), f]; };
+
+function sendMessage(text, inputId) {
+  if (!text.trim()) return;
+  state.messages.push({ from: "you", text: text.trim() }); render(); $(inputId)?.focus();
+  setTimeout(() => {
+    state.messages.push({ from: "assistant", text: "Do the hiring-manager email before your 11:00 call, then use the 14:00 block for the Previous view." });
+    const had = document.activeElement?.id; render(); if (had) $(had)?.focus();
+  }, 700);
+}
+
+// ---------- Dragging: Panels, tucked slips, and account chips torn out of Email
+let drag = null;
+document.addEventListener("pointerdown", (e) => {
+  const chip = e.target.closest(".chip");
+  const el = e.target.closest(".panel, .slip");
+  if (!el) return;
+  const f = el.dataset.panel || el.dataset.slip;
+  raise(f); el.style.zIndex = 10 + state.order.indexOf(f);
+  if (!chip && e.target.closest("input, button, a")) return;
+  e.preventDefault();
+  const r = el.getBoundingClientRect();
+  drag = { el, f, chip, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
+});
+document.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    if (drag.chip) {
+      // Tear the account out of the Email Panel: it becomes its own Panel under the pointer.
+      const a = drag.chip.dataset.account, f = `email-${a}`;
+      state.detached.push(a); raise(f); render();
+      drag = { ...drag, f, chip: null, el: document.querySelector(`[data-panel="${f}"]`), dx: 40, dy: 20 };
+    } else if (state.tucked[drag.f]) {
+      // Pulling a tucked slip out turns it back into a floating Panel.
+      delete state.tucked[drag.f]; render();
+      drag = { ...drag, el: document.querySelector(`[data-panel="${drag.f}"]`), dx: W / 2, dy: 20 };
+    }
+    drag.el.classList.add("dragging");
+  }
+  const x = e.clientX - drag.dx, y = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - drag.dy));
+  state.layout[drag.f] = { x, y };
+  drag.el.style.left = x + "px"; drag.el.style.top = y + "px";
+  drag.el.classList.toggle("leaving", x < -W * 0.35 || x > window.innerWidth - W * 0.65);
+  const email = document.querySelector('[data-panel="email"]');
+  if (email && accountOf(drag.f)) email.classList.toggle("drop-target", inside(e, email));
+});
+document.addEventListener("pointerup", (e) => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved) { if (!d.chip) setFocus(d.f); return; }
+  const p = state.layout[d.f];
+  const email = document.querySelector('[data-panel="email"]');
+  if (accountOf(d.f) && email && inside(e, email)) {
+    // Dropped back onto Email: the account rejoins the combined Panel.
+    state.detached = state.detached.filter((a) => a !== accountOf(d.f));
+    if (state.focus === d.f) state.focus = "email";
+  } else if (p.x < -W * 0.35 || p.x > window.innerWidth - W * 0.65) {
+    // Pushed off an edge: tuck it away there, and float it back in from a sensible spot later.
+    state.tucked[d.f] = { side: p.x < 0 ? "left" : "right", y: p.y };
+    state.layout[d.f] = { x: Math.max(24, Math.min(window.innerWidth - W - 24, p.x)), y: p.y };
+  }
+  persist(); render();
+});
+const inside = (e, el) => { const r = el.getBoundingClientRect(); return e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom; };
+
+// ---------- Clicks and keys
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.closest("[data-expand]")) return setFocus("assistant");
+  if (t.dataset.swatch) { state.picking = state.picking === t.dataset.swatch ? null : t.dataset.swatch; return render(); }
+  if (t.dataset.tintPick !== undefined) {
+    const f = t.closest(".panel").dataset.panel;
+    if (t.dataset.tintPick) state.colors[f] = t.dataset.tintPick; else delete state.colors[f];
+    state.picking = null; persist(); return render();
+  }
+  if (t.dataset.tab) { state.emailTab = t.dataset.tab; return render(); }
+  if (t.dataset.nav) return setFocus(t.dataset.nav);
+  if (t.dataset.toggle) { const task = state.tasks.find((x) => x.id === Number(t.dataset.toggle)); task.done = !task.done; render(); }
+});
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if ((t.classList?.contains("panel") || t.classList?.contains("slip")) && e.key === "Enter") return setFocus(t.dataset.panel || t.dataset.slip);
+  if (t.id === "new-task" && e.key === "Enter" && t.value.trim()) { state.tasks.push({ id: Date.now(), title: t.value.trim(), done: false }); render(); $("new-task").focus(); return; }
+  if ((t.id === "chat-focus" || t.id === "chat-panel") && e.key === "Enter") sendMessage(t.value, t.id);
+});
+$("reset").onclick = () => {
+  ["nexo-proto-layout-v4", "nexo-proto-tucked", "nexo-proto-detached", "nexo-proto-colors"].forEach(forget);
+  state.tucked = {}; state.detached = []; state.colors = {}; state.focus = "assistant"; loadLayout(); render({ animate: true });
+};
+
+loadLayout();
+if (!features().includes(state.focus)) state.focus = "assistant";
+render();
+</script>

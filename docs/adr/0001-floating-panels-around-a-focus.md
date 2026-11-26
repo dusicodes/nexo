@@ -6,7 +6,7 @@ status: accepted
 
 nexo has no navigation bar. One feature at a time is the **Focus** in the middle of the window. Every other feature floats around it as a **Panel**: a borderless, slightly tilted glass sheet with a glanceable summary. The user can drag Panels anywhere, overlap them, colour them, tuck them off an edge, and click one to make it the Focus. When nexo opens, the Assistant is the Focus.
 
-We chose this over a conventional top nav bar because nexo exists to show the whole day at once. Calendar, Email, GitHub, the reading list and Today stay in view as summaries around whatever the user is working on, instead of hiding behind tabs. The owner explored the layout in an interactive prototype on 2026-11-26 (https://claude.ai/artifact/LHs76Tw8xj2sP8DYof6qRw) and chose it there.
+We chose this over a conventional top nav bar because nexo exists to show the whole day at once. Calendar, Email, GitHub, the reading list and Today stay in view as summaries around whatever the user is working on, instead of hiding behind tabs. The owner explored the layout in an interactive prototype on 2026-11-26 (https://claude.ai/artifact/LHs76Tw8xj2sP8DYof6qRw) and chose it there. A copy lives at [`docs/design/floating-panels.html`](../design/floating-panels.html): open it in a browser, and treat it as the reference look when building each feature's Focus view and Panel.
 
 ## Consequences
 
