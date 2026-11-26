@@ -29,5 +29,25 @@ The view of done Tasks from earlier days, each kept for a limited time before it
 _Avoid_: History, archive, completed list
 
 **Today**:
-The signed-in home view: the user's day, showing the Tasks they mean to work on today.
+The user's day, showing the Tasks they mean to work on today.
 _Avoid_: Home, dashboard, landing page
+
+**Focus**:
+The one feature filling the middle of nexo; any feature can be the Focus, and focusing another one turns the current Focus into a Panel.
+_Avoid_: Main screen, main view, zoomed view
+
+**Panel**:
+A borderless, floating view of a feature that is not the Focus, which the user can drag anywhere and give a colour, showing a glanceable summary plus at most a quick action or two (ticking a Task, messaging the Assistant); clicking it makes that feature the Focus.
+_Avoid_: Widget, card, tile, window
+
+**Tucked Panel**:
+A Panel the user has pushed off the edge of the window, leaving only a slip at that edge that peeks out on hover; clicking it makes that feature the Focus, and dragging it back in makes it a Panel again.
+_Avoid_: Hidden, minimised, collapsed, docked
+
+**Assistant**:
+The AI the user chats with, in its Panel or as the Focus; the default Focus whenever nexo is opened.
+_Avoid_: Chatbot, bot, AI
+
+**Email account**:
+One of the user's own mailboxes that nexo reads, such as a personal account and a work & school account, each named by the user. All Email accounts share one Email Panel until the user drags one out into a Panel of its own.
+_Avoid_: Inbox, mailbox, address
