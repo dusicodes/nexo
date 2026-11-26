@@ -118,4 +118,42 @@ describe("Tasks", () => {
   it("refuses to delete a Task that does not exist", async () => {
     await expect(tasks.delete("no-such-task")).rejects.toBeInstanceOf(tasks.TaskNotFoundError);
   });
+  it("stores a Task's Details exactly as typed and shows them on Today", async () => {
+    const task = await tasks.add("Read the RFC", "2026-12-06");
+    const details = "  https://example.com/rfc\n- section 3 first\n";
+
+    const updated = await tasks.setDetails(task.id, details);
+
+    expect(updated.details).toBe(details);
+    expect((await tasks.today("2026-12-06")).map((shown) => shown.details)).toEqual([details]);
+  });
+
+  it("starts a Task with no Details and lets them be cleared", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-07");
+    expect(task.details).toBe("");
+
+    await tasks.setDetails(task.id, "Landlord's account");
+    await tasks.setDetails(task.id, "");
+
+    expect((await tasks.today("2026-12-07"))[0].details).toBe("");
+  });
+
+  it("keeps Details through a rename and a delete followed by restore", async () => {
+    const task = await tasks.add("Book flights", "2026-12-08");
+    await tasks.setDetails(task.id, "Window seat");
+    await tasks.rename(task.id, "Book flights to Lisbon");
+
+    await tasks.restore(await tasks.delete(task.id));
+
+    expect((await tasks.today("2026-12-08"))[0]).toMatchObject({
+      title: "Book flights to Lisbon",
+      details: "Window seat",
+    });
+  });
+
+  it("refuses to set Details on a Task that does not exist", async () => {
+    await expect(tasks.setDetails("no-such-task", "Notes")).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+  });
 });

@@ -17,13 +17,21 @@ import { isLocalDate, type LocalDate } from "./local-date";
 export type TodayTask = {
   id: string;
   title: string;
+  /** Plain text under the title, exactly as typed; empty when there are none. */
+  details: string;
   plannedDay: LocalDate;
   /** Where the Task stands: Today lists Tasks by ascending seq. */
   seq: number;
 };
 
 function toTodayTask(row: TaskSnapshot): TodayTask {
-  return { id: row.id, title: row.title, plannedDay: row.plannedDay, seq: row.seq };
+  return {
+    id: row.id,
+    title: row.title,
+    details: row.details,
+    plannedDay: row.plannedDay,
+    seq: row.seq,
+  };
 }
 
 function assertLocalDate(value: unknown): asserts value is LocalDate {
@@ -88,6 +96,19 @@ export async function rename(id: string, title: string): Promise<TodayTask> {
     throw new TaskNotFoundError(id);
   }
   return toTodayTask(renamed);
+}
+
+/** Replaces a Task's Details. They are kept exactly as typed, blank included. */
+export async function setDetails(id: string, details: string): Promise<TodayTask> {
+  const [updated] = await getDb()
+    .update(tasks)
+    .set({ details, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  if (updated === undefined) {
+    throw new TaskNotFoundError(id);
+  }
+  return toTodayTask(updated);
 }
 
 /**

@@ -340,8 +340,8 @@ session gate; and the AI SDK seams - DeepSeek provider, single-step
 assistant hook, MCP client and tool bridge (registry and enforcement still pending).
 The first product slice has started: the signed-in home page is Today, where the owner
 writes Tasks for the day (issue #35, part of spec #29), edits their titles in place and
-deletes them with undo (issue #32); completing, carry-over, Details and Checklist items
-follow in later tickets.
+deletes them with undo (issue #32), and adds plain-text Details under them (issue #33);
+completing, carry-over and Checklist items follow in later tickets.
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -456,6 +456,13 @@ link); update section 13 for lasting decisions; write a short ADR in
   untrusted input. Today also exposes `seq` so Undo can put a Task back in order. The page
   behaviour (click-to-edit, autosave, Esc, Backspace, the undo toast) has no automated
   test; it was checked by hand in a browser. Updates sections 6 and 12.
+- 2026-11-26 - Details (issue #33): the Tasks module gains `setDetails`, which stores a
+  Task's Details exactly as typed, behind a session-checked Server Function; `today()`
+  now returns each Task's Details. The `details` column already existed, so the schema is
+  unchanged. On the page, Shift+Enter opens Details under a Task, bare http(s) URLs in
+  them are links opening in a new tab, and Backspace on an emptied title deletes with the
+  undo toast when Details would be lost. The page behaviour has no automated test; it was
+  checked by hand in a browser. Updates section 12.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

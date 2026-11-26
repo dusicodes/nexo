@@ -39,6 +39,14 @@ export async function renameTask(id: string, title: string): Promise<tasks.Today
   return tasks.rename(id, title);
 }
 
+export async function setTaskDetails(id: string, details: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string" || typeof details !== "string") {
+    throw new Error("A Task id and its Details must be text.");
+  }
+  return tasks.setDetails(id, details);
+}
+
 export async function deleteTask(id: string): Promise<tasks.TaskSnapshot> {
   await requireSession();
   if (typeof id !== "string") {

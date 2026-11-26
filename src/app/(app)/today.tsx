@@ -5,7 +5,15 @@ import { cn } from "cn";
 import { Trash2 } from "lucide-react";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
 import type { TaskSnapshot, TodayTask } from "@/tasks/tasks";
-import { addTask, deleteTask, loadToday, renameTask, restoreTask } from "./today-actions";
+import { DetailsText } from "./details-text";
+import {
+  addTask,
+  deleteTask,
+  loadToday,
+  renameTask,
+  restoreTask,
+  setTaskDetails,
+} from "./today-actions";
 
 /**
  * Today: a calm, Notion-style page where every line is a Task. The browser
@@ -50,7 +58,7 @@ type ShownDay = { day: LocalDate; tasks: ShownTask[] };
 /** How long the "Task deleted · Undo" toast stays up. */
 const UNDO_MS = 5_000;
 
-/** How long typing in a title pauses before it is saved. */
+/** How long typing in a title or Details pauses before it is saved. */
 const AUTOSAVE_MS = 500;
 
 /** A delete that can still be undone; the snapshot arrives once the server has deleted it. */
@@ -63,6 +71,8 @@ export function Today() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [undoable, setUndoable] = useState<Undoable | null>(null);
+  // A Task just added with Shift+Enter, whose Details open once it is saved.
+  const [openDetailsOf, setOpenDetailsOf] = useState<string | null>(null);
   const newLine = useRef<HTMLInputElement>(null);
   // Saves for one Task run one after another, so a delete always sees the
   // title typed just before it, and its snapshot is what the user last saw.
@@ -109,7 +119,7 @@ export function Today() {
       previous?.day === day ? { day, tasks: change(previous.tasks) } : previous,
     );
 
-  const save = (title: string) => {
+  const save = (title: string, { openDetails = false } = {}) => {
     if (title.trim() === "") {
       return;
     }
@@ -121,7 +131,14 @@ export function Today() {
     setError(null);
     updateShownTasks(day, (tasks) => [
       ...tasks,
-      { id: placeholderId, title: title.trim(), plannedDay: day, seq: Infinity, saving: true },
+      {
+        id: placeholderId,
+        title: title.trim(),
+        details: "",
+        plannedDay: day,
+        seq: Infinity,
+        saving: true,
+      },
     ]);
     addTask(title, day).then(
       (task) => {
@@ -134,6 +151,15 @@ export function Today() {
         updateShownTasks(day, (tasks) =>
           tasks.map((shownTask) => (shownTask.id === placeholderId ? task : shownTask)),
         );
+        // Shift+Enter asked for Details; open them unless the user has
+        // already moved on to writing the next Task.
+        if (
+          openDetails &&
+          document.activeElement === newLine.current &&
+          newLine.current?.value === ""
+        ) {
+          setOpenDetailsOf(task.id);
+        }
       },
       () => {
         updateShownTasks(day, (tasks) => tasks.filter((shownTask) => shownTask.id !== placeholderId));
@@ -172,6 +198,14 @@ export function Today() {
     );
   };
 
+  const saveDetails = (id: string, details: string) => {
+    setError(null);
+    updateTasks((tasks) => tasks.map((task) => (task.id === id ? { ...task, details } : task)));
+    enqueue(id, () => setTaskDetails(id, details)).catch(() =>
+      setError("Couldn't save those Details. Try again."),
+    );
+  };
+
   // Takes the Task off the page at once and deletes it on the server.
   const deleteFromPage = (task: ShownTask): Promise<TaskSnapshot> | null => {
     const index = shown?.tasks.findIndex((shownTask) => shownTask.id === task.id) ?? -1;
@@ -197,9 +231,14 @@ export function Today() {
     }
   };
 
-  // Backspace on an emptied title: the Task goes silently.
-  const deleteSilently = (task: ShownTask) => {
-    deleteFromPage(task);
+  // Backspace on an emptied title: the Task goes silently, unless it still
+  // has Details, which would be lost, so then it offers Undo.
+  const deleteEmptied = (task: ShownTask) => {
+    if (task.details.trim() === "") {
+      deleteFromPage(task);
+    } else {
+      deleteWithUndo(task);
+    }
   };
 
   const undoDelete = ({ snapshot }: Undoable) => {
@@ -225,7 +264,8 @@ export function Today() {
       onClick={(event) => {
         // Clicking anywhere on the page that is not a control writes on the
         // new line.
-        if (!(event.target as HTMLElement).closest("input, button, a")) {
+        const target = event.target as HTMLElement;
+        if (!target.closest("input, textarea, button, a, [data-details]")) {
           newLine.current?.focus();
         }
       }}
@@ -241,10 +281,13 @@ export function Today() {
             <TaskLine
               key={task.id}
               task={task}
+              openDetails={openDetailsOf === task.id}
+              onDetailsOpened={() => setOpenDetailsOf(null)}
               onTitleChange={(title) => saveTitle(task.id, title)}
+              onDetailsChange={(details) => saveDetails(task.id, details)}
               onDelete={() => deleteWithUndo(task)}
               onEmptied={() => {
-                deleteSilently(task);
+                deleteEmptied(task);
                 newLine.current?.focus();
               }}
             />
@@ -262,7 +305,7 @@ export function Today() {
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.nativeEvent.isComposing) {
                   event.preventDefault();
-                  save(draft);
+                  save(draft, { openDetails: event.shiftKey });
                 }
               }}
               // Autosave: text left on the new line is saved when it loses
@@ -303,67 +346,145 @@ export function Today() {
 }
 
 /**
- * One Task line. Clicking the title edits it in place: typing autosaves after
- * a short pause and on leaving the line, Esc puts back the title from before
- * the edit, and Backspace on an emptied title removes the Task. A blank title
- * is never saved; leaving one blank restores the previous title.
+ * Saves a value after typing pauses, at once when asked, and on unmount if a
+ * save is still waiting (the day changes, the page navigates), so nothing
+ * typed is dropped. A value equal to the last one saved is not sent again.
  */
-function TaskLine({
-  task,
-  onTitleChange,
-  onDelete,
-  onEmptied,
-}: {
-  task: ShownTask;
-  onTitleChange: (title: string) => void;
-  onDelete: () => void;
-  onEmptied: () => void;
-}) {
-  const [edit, setEdit] = useState<{ original: string; value: string } | null>(null);
-  const lastSavedTitle = useRef(task.title);
-  const editEnded = useRef(false);
+function useAutosave(commit: (value: string) => void, saved: string) {
   const timer = useRef<number | undefined>(undefined);
-  const titleButton = useRef<HTMLButtonElement>(null);
+  const pending = useRef<(() => void) | null>(null);
+  const lastSaved = useRef(saved);
 
-  // A title still waiting for its autosave when the line goes away (the day
-  // changes, the page navigates) is saved rather than dropped.
-  const pendingSave = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       window.clearTimeout(timer.current);
-      pendingSave.current?.();
+      pending.current?.();
     },
     [],
   );
 
-  const save = (value: string) => {
+  const cancel = () => {
     window.clearTimeout(timer.current);
-    pendingSave.current = null;
-    const title = value.trim();
-    if (title !== "" && title !== lastSavedTitle.current) {
-      lastSavedTitle.current = title;
-      onTitleChange(title);
+    pending.current = null;
+  };
+
+  const saveNow = (value: string) => {
+    cancel();
+    if (value !== lastSaved.current) {
+      lastSaved.current = value;
+      commit(value);
     }
   };
 
-  const startEditing = () => {
-    lastSavedTitle.current = task.title;
-    editEnded.current = false;
-    setEdit({ original: task.title, value: task.title });
+  return {
+    /** Starts an edit of a value currently saved as `saved`. */
+    start: (saved: string) => {
+      lastSaved.current = saved;
+    },
+    schedule: (value: string) => {
+      cancel();
+      const run = () => saveNow(value);
+      pending.current = run;
+      timer.current = window.setTimeout(run, AUTOSAVE_MS);
+    },
+    saveNow,
+    cancel,
+  };
+}
+
+/** An edit in progress: the text from before it, and the text now. */
+type Edit = { original: string; value: string };
+
+/** Grows a textarea to fit its text, wrapped lines included. */
+function fitHeight(textarea: HTMLTextAreaElement) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+/**
+ * One Task line. Clicking the title edits it in place: typing autosaves after
+ * a short pause and on leaving the line, Esc puts back the title from before
+ * the edit, and Backspace on an emptied title removes the Task. A blank title
+ * is never saved; leaving one blank restores the previous title.
+ *
+ * Shift+Enter in the title starts a new line of Details, shown muted under
+ * the title. Details autosave the same way and are kept exactly as typed;
+ * Shift+Enter in them starts another line, Enter or Esc ends the edit (Esc
+ * putting back the Details from before it), and Backspace in empty Details
+ * returns to the title.
+ */
+function TaskLine({
+  task,
+  openDetails,
+  onDetailsOpened,
+  onTitleChange,
+  onDetailsChange,
+  onDelete,
+  onEmptied,
+}: {
+  task: ShownTask;
+  /** Opens the Details editor when the line first appears. */
+  openDetails: boolean;
+  onDetailsOpened: () => void;
+  onTitleChange: (title: string) => void;
+  onDetailsChange: (details: string) => void;
+  onDelete: () => void;
+  onEmptied: () => void;
+}) {
+  const [titleEdit, setTitleEdit] = useState<Edit | null>(null);
+  const [detailsEdit, setDetailsEdit] = useState<Edit | null>(() =>
+    openDetails ? { original: task.details, value: task.details } : null,
+  );
+  const titleEditEnded = useRef(false);
+  const detailsEditEnded = useRef(false);
+  const titleButton = useRef<HTMLButtonElement>(null);
+  const titleSave = useAutosave(onTitleChange, task.title);
+  const detailsSave = useAutosave(onDetailsChange, task.details);
+
+  const startTitleEditing = () => {
+    titleSave.start(task.title);
+    titleEditEnded.current = false;
+    setTitleEdit({ original: task.title, value: task.title });
   };
 
-  // Ends the edit once, keeping `value` (or the original title if it is blank).
-  const endEditing = (value: string, { refocus }: { refocus: boolean }) => {
-    if (edit === null || editEnded.current) {
+  // Ends the title edit once, keeping `value` (or the original title if it is blank).
+  const endTitleEditing = (value: string, { refocus }: { refocus: boolean }) => {
+    if (titleEdit === null || titleEditEnded.current) {
       return;
     }
-    editEnded.current = true;
-    save(value.trim() === "" ? edit.original : value);
-    setEdit(null);
+    titleEditEnded.current = true;
+    titleSave.saveNow(value.trim() === "" ? titleEdit.original : value.trim());
+    setTitleEdit(null);
     if (refocus) {
       requestAnimationFrame(() => titleButton.current?.focus());
     }
   };
+
+  // Opens Details for editing, with the caret on a fresh line below what is
+  // already there when `newLine` is set (Shift+Enter in the title).
+  const startDetailsEditing = ({ newLine }: { newLine: boolean }) => {
+    const value = newLine && task.details !== "" ? `${task.details}\n` : task.details;
+    detailsSave.start(task.details);
+    detailsEditEnded.current = false;
+    setDetailsEdit({ original: task.details, value });
+  };
+
+  // Ends the Details edit once. Empty lines left at the end (from Shift+Enter
+  // with nothing typed after it) are dropped; everything else stays as typed.
+  const endDetailsEditing = (value: string, { refocus }: { refocus: boolean }) => {
+    if (detailsEdit === null || detailsEditEnded.current) {
+      return;
+    }
+    detailsEditEnded.current = true;
+    detailsSave.saveNow(value.replace(/\n+$/, ""));
+    setDetailsEdit(null);
+    if (refocus) {
+      requestAnimationFrame(() => titleButton.current?.focus());
+    }
+  };
+
+  // The Details as the page shows them: what is being typed, else what is saved.
+  const details = detailsEdit?.value ?? task.details;
 
   return (
     <li
@@ -373,55 +494,119 @@ function TaskLine({
       )}
     >
       <TaskBox />
-      {edit === null ? (
-        <button
-          ref={titleButton}
-          type="button"
-          disabled={task.saving}
-          aria-label={`Edit Task: ${task.title}`}
-          className="min-w-0 flex-1 cursor-text text-left text-base leading-7 break-words outline-none"
-          onClick={startEditing}
-        >
-          {task.title}
-        </button>
-      ) : (
-        <input
-          value={edit.value}
-          aria-label="Task title"
-          autoFocus
-          className="min-w-0 flex-1 bg-transparent text-base leading-7 outline-none"
-          onFocus={(event) => {
-            const end = event.target.value.length;
-            event.target.setSelectionRange(end, end);
-          }}
-          onChange={(event) => {
-            const value = event.target.value;
-            setEdit({ ...edit, value });
-            window.clearTimeout(timer.current);
-            pendingSave.current = () => save(value);
-            timer.current = window.setTimeout(() => save(value), AUTOSAVE_MS);
-          }}
-          onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) {
-              return;
-            }
-            if (event.key === "Escape") {
-              event.preventDefault();
-              endEditing(edit.original, { refocus: true });
-            } else if (event.key === "Enter") {
-              event.preventDefault();
-              endEditing(edit.value, { refocus: true });
-            } else if (event.key === "Backspace" && edit.value === "") {
-              event.preventDefault();
-              window.clearTimeout(timer.current);
-              pendingSave.current = null;
-              editEnded.current = true;
-              onEmptied();
-            }
-          }}
-          onBlur={() => endEditing(edit.value, { refocus: false })}
-        />
-      )}
+      <div className="min-w-0 flex-1">
+        {titleEdit === null ? (
+          <button
+            ref={titleButton}
+            type="button"
+            disabled={task.saving}
+            aria-label={`Edit Task: ${task.title}`}
+            className="block w-full cursor-text text-left text-base leading-7 break-words outline-none"
+            onClick={startTitleEditing}
+          >
+            {task.title}
+          </button>
+        ) : (
+          <input
+            value={titleEdit.value}
+            aria-label="Task title"
+            autoFocus
+            className="block w-full bg-transparent text-base leading-7 outline-none"
+            onFocus={(event) => {
+              const end = event.target.value.length;
+              event.target.setSelectionRange(end, end);
+            }}
+            onChange={(event) => {
+              const value = event.target.value;
+              setTitleEdit({ ...titleEdit, value });
+              if (value.trim() === "") {
+                titleSave.cancel();
+              } else {
+                titleSave.schedule(value.trim());
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) {
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                endTitleEditing(titleEdit.original, { refocus: true });
+              } else if (event.key === "Enter" && event.shiftKey) {
+                event.preventDefault();
+                endTitleEditing(titleEdit.value, { refocus: false });
+                startDetailsEditing({ newLine: true });
+              } else if (event.key === "Enter") {
+                event.preventDefault();
+                endTitleEditing(titleEdit.value, { refocus: true });
+              } else if (event.key === "Backspace" && titleEdit.value === "") {
+                event.preventDefault();
+                titleSave.cancel();
+                titleEditEnded.current = true;
+                onEmptied();
+              }
+            }}
+            onBlur={() => endTitleEditing(titleEdit.value, { refocus: false })}
+          />
+        )}
+        {detailsEdit !== null ? (
+          <textarea
+            value={detailsEdit.value}
+            aria-label="Task Details"
+            autoFocus
+            rows={1}
+            ref={(textarea) => {
+              if (textarea !== null) {
+                fitHeight(textarea);
+              }
+            }}
+            className="block w-full resize-none bg-transparent text-sm leading-6 text-muted-foreground outline-none"
+            onFocus={(event) => {
+              const end = event.target.value.length;
+              event.target.setSelectionRange(end, end);
+              onDetailsOpened();
+            }}
+            onChange={(event) => {
+              const value = event.target.value;
+              fitHeight(event.target);
+              setDetailsEdit({ ...detailsEdit, value });
+              detailsSave.schedule(value);
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) {
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                endDetailsEditing(detailsEdit.original, { refocus: true });
+              } else if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                endDetailsEditing(detailsEdit.value, { refocus: true });
+              } else if (event.key === "Backspace" && detailsEdit.value === "") {
+                event.preventDefault();
+                endDetailsEditing("", { refocus: false });
+                startTitleEditing();
+              }
+              // Shift+Enter is left to the textarea: it starts a new line.
+            }}
+            onBlur={() => endDetailsEditing(detailsEdit.value, { refocus: false })}
+          />
+        ) : (
+          details !== "" && (
+            <p
+              data-details
+              className="cursor-text text-sm leading-6 break-words whitespace-pre-wrap text-muted-foreground"
+              onClick={(event) => {
+                if (!task.saving && !(event.target as HTMLElement).closest("a")) {
+                  startDetailsEditing({ newLine: false });
+                }
+              }}
+            >
+              <DetailsText details={details} />
+            </p>
+          )
+        )}
+      </div>
       {!task.saving && (
         <button
           type="button"
