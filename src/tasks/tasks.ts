@@ -1,10 +1,10 @@
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { tasks } from "@/db/schema";
-import { normaliseDetails, tickChecklistItem } from "./details";
+import { normaliseDetails, tickChecklistItem, type ChecklistItemRef } from "./details";
 import { isLocalDate, type LocalDate } from "./local-date";
 
-export { NotAChecklistItemError } from "./details";
+export { NotAChecklistItemError, type ChecklistItemRef } from "./details";
 
 /**
  * The Tasks module: the only code that reads or writes Tasks (GLOSSARY.md).
@@ -157,28 +157,33 @@ export async function reopen(id: string): Promise<TodayTask> {
 }
 
 /**
- * Ticks or unticks the Checklist item on line `lineIndex` (from 0) of a Task's
- * Details, rewriting only that line's marker. It refuses a line that is not a
- * Checklist item, and never completes or reopens the Task.
+ * Ticks or unticks one Checklist item in a Task's Details, named by its line
+ * and its text, rewriting only that line's marker. It refuses a line that is
+ * not that Checklist item (so a page with stale Details never ticks the wrong
+ * one), and never completes or reopens the Task.
  */
 export async function setChecklistItem(
   id: string,
-  lineIndex: number,
+  item: ChecklistItemRef,
   ticked: boolean,
 ): Promise<TodayTask> {
-  // Read and write in one transaction, so a Details save cannot land between them.
-  return getDb().transaction(async (tx) => {
-    const [task] = await tx.select().from(tasks).where(eq(tasks.id, id)).for("update");
+  // Read, then write only if the Details are still what was read, so a save
+  // landing in between is never overwritten. Plain SQL, no row locks, so it
+  // stays within the portable subset (architecture.md section 6).
+  for (;;) {
+    const [task] = await getDb().select().from(tasks).where(eq(tasks.id, id));
     if (task === undefined) {
       throw new TaskNotFoundError(id);
     }
-    const [updated] = await tx
+    const [updated] = await getDb()
       .update(tasks)
-      .set({ details: tickChecklistItem(task.details, lineIndex, ticked), updatedAt: new Date() })
-      .where(eq(tasks.id, id))
+      .set({ details: tickChecklistItem(task.details, item, ticked), updatedAt: new Date() })
+      .where(and(eq(tasks.id, id), eq(tasks.details, task.details)))
       .returning();
-    return toTodayTask(updated);
-  });
+    if (updated !== undefined) {
+      return toTodayTask(updated);
+    }
+  }
 }
 
 /**

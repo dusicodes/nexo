@@ -65,14 +65,21 @@ export async function reopenTask(id: string): Promise<tasks.TodayTask> {
 
 export async function setTaskChecklistItem(
   id: string,
-  lineIndex: number,
+  item: tasks.ChecklistItemRef,
   ticked: boolean,
 ): Promise<tasks.TodayTask> {
   await requireSession();
-  if (typeof id !== "string" || typeof lineIndex !== "number" || typeof ticked !== "boolean") {
-    throw new Error("A Task id, line number and ticked state are needed.");
+  if (
+    typeof id !== "string" ||
+    typeof item !== "object" ||
+    item === null ||
+    typeof item.lineIndex !== "number" ||
+    typeof item.text !== "string" ||
+    typeof ticked !== "boolean"
+  ) {
+    throw new Error("A Task id, a Checklist item and its ticked state are needed.");
   }
-  return tasks.setChecklistItem(id, lineIndex, ticked);
+  return tasks.setChecklistItem(id, { lineIndex: item.lineIndex, text: item.text }, ticked);
 }
 
 export async function deleteTask(id: string): Promise<tasks.TaskSnapshot> {

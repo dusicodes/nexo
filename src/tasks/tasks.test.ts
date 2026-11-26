@@ -159,7 +159,9 @@ describe("Tasks", () => {
   it("saves a \"[ ] \" Checklist item as \"[] \" and keeps other lines as typed", async () => {
     const task = await tasks.add("Write the post", "2026-12-09");
 
-    const updated = await tasks.setDetails(task.id, "[ ] Draft\n- [ ] not a Checklist item\n[x] Outline");
+    const details = "[ ] Draft\n- [ ] not a Checklist item\n[x] Outline";
+
+    const updated = await tasks.setDetails(task.id, details);
 
     expect(updated.details).toBe("[] Draft\n- [ ] not a Checklist item\n[x] Outline");
   });
@@ -168,25 +170,28 @@ describe("Tasks", () => {
     const task = await tasks.add("Write the post", "2026-12-10");
     await tasks.setDetails(task.id, "https://example.com\n[] Draft\n[] Edit");
 
-    const ticked = await tasks.setChecklistItem(task.id, 2, true);
+    const edit = { lineIndex: 2, text: "Edit" };
+    const ticked = await tasks.setChecklistItem(task.id, edit, true);
     expect(ticked.details).toBe("https://example.com\n[] Draft\n[x] Edit");
 
-    await tasks.setChecklistItem(task.id, 2, false);
+    await tasks.setChecklistItem(task.id, edit, false);
     expect((await tasks.today("2026-12-10"))[0].details).toBe(
       "https://example.com\n[] Draft\n[] Edit",
     );
   });
 
-  it("refuses to tick a line that is not a Checklist item and leaves the Details alone", async () => {
+  it("refuses to tick a line that is not a Checklist item, leaving the Details", async () => {
     const task = await tasks.add("Write the post", "2026-12-11");
     await tasks.setDetails(task.id, "- outline\n[] Draft");
 
-    await expect(tasks.setChecklistItem(task.id, 0, true)).rejects.toBeInstanceOf(
-      tasks.NotAChecklistItemError,
-    );
-    await expect(tasks.setChecklistItem(task.id, 2, true)).rejects.toBeInstanceOf(
-      tasks.NotAChecklistItemError,
-    );
+    for (const item of [
+      { lineIndex: 0, text: "- outline" },
+      { lineIndex: 2, text: "Draft" },
+    ]) {
+      await expect(tasks.setChecklistItem(task.id, item, true)).rejects.toBeInstanceOf(
+        tasks.NotAChecklistItemError,
+      );
+    }
 
     expect((await tasks.today("2026-12-11"))[0].details).toBe("- outline\n[] Draft");
   });
@@ -195,14 +200,16 @@ describe("Tasks", () => {
     const task = await tasks.add("Write the post", "2026-12-12");
     await tasks.setDetails(task.id, "[] Draft");
 
-    await tasks.setChecklistItem(task.id, 0, true);
+    await tasks.setChecklistItem(task.id, { lineIndex: 0, text: "Draft" }, true);
 
     // The snapshot holds every stored field, including the day it was completed.
     expect((await tasks.delete(task.id)).completedDay).toBeNull();
   });
 
   it("refuses to tick a Checklist item of a Task that does not exist", async () => {
-    await expect(tasks.setChecklistItem("no-such-task", 0, true)).rejects.toBeInstanceOf(
+    const draft = { lineIndex: 0, text: "Draft" };
+
+    await expect(tasks.setChecklistItem("no-such-task", draft, true)).rejects.toBeInstanceOf(
       tasks.TaskNotFoundError,
     );
   });
@@ -275,5 +282,16 @@ describe("Tasks", () => {
     const task = await tasks.add("Pay rent", "2026-12-20");
 
     await expect(tasks.complete(task.id, "20/12/2026")).rejects.toThrow("Not a local date");
+  });
+  it("refuses to tick a line that no longer holds the Checklist item asked for", async () => {
+    const task = await tasks.add("Write the post", "2026-12-21");
+    await tasks.setDetails(task.id, "[] Outline first\n[] Draft");
+
+    // The page still showed "Draft" on line 0, before the line above was saved.
+    await expect(
+      tasks.setChecklistItem(task.id, { lineIndex: 0, text: "Draft" }, true),
+    ).rejects.toBeInstanceOf(tasks.NotAChecklistItemError);
+
+    expect((await tasks.today("2026-12-21"))[0].details).toBe("[] Outline first\n[] Draft");
   });
 });

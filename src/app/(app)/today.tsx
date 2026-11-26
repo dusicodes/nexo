@@ -5,7 +5,7 @@ import { cn } from "cn";
 import { Check, Trash2 } from "lucide-react";
 import { normaliseDetails, readDetails, tickChecklistItem } from "@/tasks/details";
 import { startOfLocalDate, toLocalDate, type LocalDate } from "@/tasks/local-date";
-import type { TaskSnapshot, TodayTask } from "@/tasks/tasks";
+import type { ChecklistItemRef, TaskSnapshot, TodayTask } from "@/tasks/tasks";
 import { DetailsText } from "./details-text";
 import {
   addTask,
@@ -206,15 +206,22 @@ export function Today() {
   const saveDetails = (id: string, details: string) => {
     setError(null);
     updateTasks((tasks) => tasks.map((task) => (task.id === id ? { ...task, details } : task)));
-    enqueue(id, () => setTaskDetails(id, details)).catch(() =>
-      setError("Couldn't save those Details. Try again."),
-    );
+    enqueue(id, () => setTaskDetails(id, details)).catch(() => {
+      setError("Couldn't save those Details. Try again.");
+      reloadAfterFailure();
+    });
   };
 
+  // After a failed save the page may no longer match what is stored, and
+  // later clicks may have changed it again, so it reloads from the server
+  // rather than guessing what to put back.
+  const reloadAfterFailure = () => setReloads((count) => count + 1);
+
   // Ticks a Task done (or unticks it to reopen it) on the page at once, then
-  // on the server; if that fails, the Task goes back to how it was.
+  // on the server. It is done on the day the page shows, which the Task
+  // belongs to, even if the clock has just passed midnight.
   const setDone = (task: ShownTask, done: boolean) => {
-    const completedDay = done ? currentLocalDate() : null;
+    const completedDay = done ? (shown?.day ?? currentLocalDate()) : null;
     const mark = (to: LocalDate | null) =>
       updateTasks((tasks) =>
         tasks.map((shownTask) =>
@@ -226,29 +233,27 @@ export function Today() {
     enqueue(task.id, () =>
       completedDay === null ? reopenTask(task.id) : completeTask(task.id, completedDay),
     ).catch(() => {
-      mark(task.completedDay);
       setError(`Couldn't ${done ? "complete" : "reopen"} that Task. Try again.`);
+      reloadAfterFailure();
     });
   };
 
-  // Ticks or unticks a Checklist item on the page at once, then on the server;
-  // if that fails, the line goes back to how it was (unless it has since been
-  // edited into something that is no longer a Checklist item).
-  const tickItem = (id: string, lineIndex: number, ticked: boolean) => {
-    const retick = (to: boolean) =>
-      updateTasks((tasks) =>
-        tasks.map((task) => {
-          if (task.id !== id || readDetails(task.details)[lineIndex]?.kind !== "checklist") {
-            return task;
-          }
-          return { ...task, details: tickChecklistItem(task.details, lineIndex, to) };
-        }),
-      );
+  // Ticks or unticks a Checklist item on the page at once, then on the server.
+  const tickItem = (id: string, item: ChecklistItemRef, ticked: boolean) => {
     setError(null);
-    retick(ticked);
-    enqueue(id, () => setTaskChecklistItem(id, lineIndex, ticked)).catch(() => {
-      retick(!ticked);
+    updateTasks((tasks) =>
+      tasks.map((task) => {
+        // The line was a Checklist item when clicked; if the Details changed
+        // since, the page leaves them and the server decides.
+        if (task.id !== id || readDetails(task.details)[item.lineIndex]?.text !== item.text) {
+          return task;
+        }
+        return { ...task, details: tickChecklistItem(task.details, item, ticked) };
+      }),
+    );
+    enqueue(id, () => setTaskChecklistItem(id, item, ticked)).catch(() => {
       setError("Couldn't save that Checklist item. Try again.");
+      reloadAfterFailure();
     });
   };
 
@@ -331,7 +336,7 @@ export function Today() {
               onDetailsOpened={() => setOpenDetailsOf(null)}
               onTitleChange={(title) => saveTitle(task.id, title)}
               onDetailsChange={(details) => saveDetails(task.id, details)}
-              onChecklistItemTick={(lineIndex, ticked) => tickItem(task.id, lineIndex, ticked)}
+              onChecklistItemTick={(item, ticked) => tickItem(task.id, item, ticked)}
               onDoneChange={(done) => setDone(task, done)}
               onDelete={() => deleteWithUndo(task)}
               onEmptied={() => {
@@ -530,7 +535,7 @@ function TaskLine({
   onDetailsOpened: () => void;
   onTitleChange: (title: string) => void;
   onDetailsChange: (details: string) => void;
-  onChecklistItemTick: (lineIndex: number, ticked: boolean) => void;
+  onChecklistItemTick: (item: ChecklistItemRef, ticked: boolean) => void;
   onDoneChange: (done: boolean) => void;
   onDelete: () => void;
   onEmptied: () => void;
@@ -739,7 +744,9 @@ function TaskLine({
                       disabled={task.saving || done}
                       aria-label={`Checklist item: ${line.text}`}
                       className="mt-1.5 size-3.5 shrink-0 cursor-pointer accent-foreground"
-                      onChange={(event) => onChecklistItemTick(lineIndex, event.target.checked)}
+                      onChange={(event) =>
+                        onChecklistItemTick({ lineIndex, text: line.text }, event.target.checked)
+                      }
                     />
                     <span
                       data-line-text

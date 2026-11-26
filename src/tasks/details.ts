@@ -17,10 +17,17 @@ const TICKED = "[x] ";
 /** Also accepted for an open Checklist item; normaliseDetails rewrites it to "[] ". */
 const OPEN_SPACED = "[ ] ";
 
-/** Thrown when a line asked to be ticked or unticked is not a Checklist item. */
+/**
+ * Names one Checklist item: its line (counting from 0) and its text without
+ * the marker. The text guards against ticking the wrong item when the Details
+ * changed since the caller read them.
+ */
+export type ChecklistItemRef = { lineIndex: number; text: string };
+
+/** Thrown when the line asked to be ticked or unticked is not that Checklist item. */
 export class NotAChecklistItemError extends Error {
-  constructor(lineIndex: number) {
-    super(`Line ${lineIndex} of these Details is not a Checklist item.`);
+  constructor({ lineIndex, text }: ChecklistItemRef) {
+    super(`Line ${lineIndex} of these Details is not the Checklist item "${text}".`);
     this.name = "NotAChecklistItemError";
   }
 }
@@ -50,15 +57,20 @@ export function readDetails(details: string): DetailsLine[] {
 }
 
 /**
- * Ticks or unticks the Checklist item on line `lineIndex` (counting from 0),
- * rewriting only that line's marker. Refuses any other line.
+ * Ticks or unticks one Checklist item, rewriting only its line's marker.
+ * Refuses a line that is not a Checklist item with that text.
  */
-export function tickChecklistItem(details: string, lineIndex: number, ticked: boolean): string {
+export function tickChecklistItem(
+  details: string,
+  item: ChecklistItemRef,
+  ticked: boolean,
+): string {
+  const { lineIndex } = item;
   const lines = details.split("\n");
   const line = Number.isInteger(lineIndex) ? lines[lineIndex] : undefined;
   const read = line === undefined ? undefined : readLine(line);
-  if (read?.kind !== "checklist") {
-    throw new NotAChecklistItemError(lineIndex);
+  if (read?.kind !== "checklist" || read.text !== item.text) {
+    throw new NotAChecklistItemError(item);
   }
   lines[lineIndex] = (ticked ? TICKED : OPEN) + read.text;
   return lines.join("\n");

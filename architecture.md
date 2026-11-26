@@ -487,6 +487,13 @@ link); update section 13 for lasting decisions; write a short ADR in
   lists done Tasks below the open ones; every Task stays in the order it was added, done or
   not, and a new Task goes at the end. This replaces the open-then-done order from spec
   #29 and issue #30. Updates section 6.
+- 2026-11-26 - Review fixes for Today: `setChecklistItem` now names the Checklist item by
+  its line and its text and refuses a line that no longer holds that item, so a page with
+  stale Details cannot tick the wrong one; it writes with a conditional update (only if
+  the Details are unchanged since read) instead of a Postgres-only row lock, keeping to
+  the portable subset. A Task is completed on the day the page shows, not the clock's day,
+  so one ticked just after midnight stays with its day. After a failed save the page
+  reloads Today rather than rolling back by guesswork. Updates section 6.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query
