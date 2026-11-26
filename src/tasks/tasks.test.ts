@@ -60,4 +60,62 @@ describe("Tasks", () => {
     await expect(tasks.add("Pay rent", "2026-02-30")).rejects.toThrow("Not a local date");
     await expect(tasks.today("26/11/2026")).rejects.toThrow("Not a local date");
   });
+
+  it("renames a Task, trimming the new title", async () => {
+    const task = await tasks.add("Email the hiring maneger", "2026-12-02");
+
+    const renamed = await tasks.rename(task.id, "  Email the hiring manager ");
+
+    expect(renamed.title).toBe("Email the hiring manager");
+    expect((await tasks.today("2026-12-02")).map((shown) => shown.title)).toEqual([
+      "Email the hiring manager",
+    ]);
+  });
+
+  it("refuses to rename a Task to a blank title and keeps the old one", async () => {
+    const task = await tasks.add("Pay rent", "2026-12-03");
+
+    await expect(tasks.rename(task.id, "  ")).rejects.toBeInstanceOf(tasks.BlankTaskTitleError);
+
+    expect((await tasks.today("2026-12-03")).map((shown) => shown.title)).toEqual(["Pay rent"]);
+  });
+
+  it("refuses to rename a Task that does not exist", async () => {
+    await expect(tasks.rename("no-such-task", "Pay rent")).rejects.toBeInstanceOf(
+      tasks.TaskNotFoundError,
+    );
+  });
+
+  it("deletes a Task from Today", async () => {
+    await tasks.add("Keep", "2026-12-04");
+    const doomed = await tasks.add("Delete me", "2026-12-04");
+
+    await tasks.delete(doomed.id);
+
+    expect((await tasks.today("2026-12-04")).map((shown) => shown.title)).toEqual(["Keep"]);
+  });
+
+  it("restores a deleted Task identically, in its old place", async () => {
+    await tasks.add("First", "2026-12-05");
+    const middle = await tasks.add("Middle", "2026-12-05");
+    await tasks.add("Last", "2026-12-05");
+    const before = await tasks.today("2026-12-05");
+
+    const snapshot = await tasks.delete(middle.id);
+    await tasks.add("Added while deleted", "2026-12-05");
+    await tasks.restore(snapshot);
+
+    expect(await tasks.today("2026-12-05")).toEqual([
+      before[0],
+      before[1],
+      before[2],
+      expect.objectContaining({ title: "Added while deleted" }),
+    ]);
+    // The snapshot carries every stored field, so deleting again gives the same one.
+    expect(await tasks.delete(middle.id)).toEqual(snapshot);
+  });
+
+  it("refuses to delete a Task that does not exist", async () => {
+    await expect(tasks.delete("no-such-task")).rejects.toBeInstanceOf(tasks.TaskNotFoundError);
+  });
 });

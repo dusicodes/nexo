@@ -132,7 +132,7 @@ Boundary rules:
 | Desktop persistence | SQLite managed by the Tauri shell, exposed to the app | `selected` |
 | Server data path | Same Drizzle schema against a Postgres server through `pg` (node-postgres): `pglite-server` in development, a real Postgres for a self-hosted deployment or future sync hub. Exercised against `pglite-server`; not yet against a real Postgres | `implemented` |
 | Schema portability | Keep SQL within Drizzle's portable subset so one schema serves all three backends. The committed schema already stays within the subset | `implemented` |
-| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Tested against in-memory PGlite with the real migrations | `implemented` |
+| Tasks | `tasks` table, read and written only through the Tasks module (`src/tasks/tasks.ts`). Planned and completed days are local calendar days stored as `YYYY-MM-DD` text; the browser sends its local day with every call, so the server never infers a time zone. An identity `seq` column records insertion order, which `created_at` cannot (two inserts in one millisecond tie on PGlite). Deleting returns a full snapshot of the row and restoring re-inserts it with its original id and `seq`, so an undone delete puts the Task back in its place (issue #32). Tested against in-memory PGlite with the real migrations | `implemented` |
 | Multi-device sync | None; seam reserved. Options: self-hosted Postgres hub, E2EE sync service, file-based snapshot sync | `deferred` (revisit after v1) |
 
 - **Data ownership:** each module writes its entities only through repositories. The UI
@@ -339,8 +339,9 @@ Google sign-in route, login page and sign-out button, the email allowlist, and t
 session gate; and the AI SDK seams - DeepSeek provider, single-step
 assistant hook, MCP client and tool bridge (registry and enforcement still pending).
 The first product slice has started: the signed-in home page is Today, where the owner
-writes Tasks for the day (issue #35, part of spec #29); completing, carry-over, editing,
-Details and Checklist items follow in later tickets.
+writes Tasks for the day (issue #35, part of spec #29), edits their titles in place and
+deletes them with undo (issue #32); completing, carry-over, Details and Checklist items
+follow in later tickets.
 
 **Selected v1 direction (from `PRD.md`):** the daily planning loop with GitHub and
 reading inputs: the assistant plans the day from the todo list, produces a daily summary;
@@ -447,6 +448,14 @@ link); update section 13 for lasting decisions; write a short ADR in
   the browser decides it and the day switches at local midnight. Tests share a new
   database-only helper (`src/test/test-database.ts`) that the auth test helper now
   builds on. Updates sections 6, 7, 12, 13 (D11) and 14.
+- 2026-11-26 - Edit titles and delete with undo (issue #32): the Tasks module gains
+  `rename`, `delete` (returns a full snapshot) and `restore` (re-inserts the snapshot
+  with its id and `seq`), each behind a session-checked Server Function. The undo
+  snapshot lives in the browser for the toast's five seconds rather than as a soft-delete
+  column, so the schema is unchanged; `restore` therefore checks the snapshot as
+  untrusted input. Today also exposes `seq` so Undo can put a Task back in order. The page
+  behaviour (click-to-edit, autosave, Esc, Backspace, the undo toast) has no automated
+  test; it was checked by hand in a browser. Updates sections 6 and 12.
 
 - 2026-11-24 - Single owner for the local database. Symptom: after restarting the dev
   server every page failed with "Failed to get session"; PGlite aborted on every query

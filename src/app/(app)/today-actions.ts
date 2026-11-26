@@ -30,3 +30,27 @@ export async function addTask(title: string, localDate: string): Promise<tasks.T
   }
   return tasks.add(title, localDate);
 }
+
+export async function renameTask(id: string, title: string): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof id !== "string" || typeof title !== "string") {
+    throw new Error("A Task id and title must be text.");
+  }
+  return tasks.rename(id, title);
+}
+
+export async function deleteTask(id: string): Promise<tasks.TaskSnapshot> {
+  await requireSession();
+  if (typeof id !== "string") {
+    throw new Error("A Task id must be text.");
+  }
+  return tasks.delete(id);
+}
+
+export async function restoreTask(snapshot: tasks.TaskSnapshot): Promise<tasks.TodayTask> {
+  await requireSession();
+  if (typeof snapshot !== "object" || snapshot === null) {
+    throw new Error("Not a Task snapshot.");
+  }
+  return tasks.restore(snapshot);
+}
